@@ -19,6 +19,24 @@ export async function heronAuthMiddleware(req: AuthenticatedRequest, res: Respon
     const token: string = authHeader.split(" ")[1];
     
     const payload : AccessTokenClaims = await verifyToken(token);
+    
+    if(!payload.email || !payload.name || !payload.sub || !payload.role || !payload.college_department) {
+      throw new AppError(
+        401,
+        "AUTH_INVALID_TOKEN",
+        "Token is missing required fields",
+        true
+      );
+    }
+
+    if(payload.role !== "counselor" && payload.role !== "admin" && payload.role !== "super_admin") {
+      throw new AppError(
+        403,
+        "AUTH_FORBIDDEN",
+        "The user does not have permission to access this resource",
+        true
+      );
+    }
 
     // Attach user info to request object
     req.user = {
