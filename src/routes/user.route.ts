@@ -13,34 +13,53 @@ const userController = new UserController(userService);
 
 /**
  * @openapi
- * /counselor/logout:
- *   post:
- *     summary: Counselor logout
+ * /students:
+ *   get:
+ *     summary: Fetch all students with classifications
  *     description: |
- *       Logs out a counselor by invalidating the provided refresh token.  
- *       - The refresh token must be supplied in the request body.  
- *       - If valid, the refresh token will be deleted from the database, ending the session.  
- *       - If missing or invalid, the request will fail with an appropriate error response.
+ *       Retrieves a paginated list of students with their most recent classification records.
+ *       - **Counselors**: Can only see students from their assigned department
+ *       - **Admins/Super Admins**: Can see students from all departments
+ *       - Supports filtering by classification type, flagged status, and department
+ *       - Uses cursor-based pagination for efficient data retrieval
+ *       - Email addresses are anonymized (e.g., a****r@umak.edu.ph)
  *     tags:
- *       - Counselor Authentication
- *     security: []   # No bearerAuth required, only refresh token in body
- *     requestBody:
- *       required: true
- *       description: The refresh token that should be invalidated on logout.
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - refresh_token
- *             properties:
- *               refresh_token:
- *                 type: string
- *                 description: The refresh token to be invalidated
- *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6...
+ *       - Students
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: classification
+ *         schema:
+ *           type: string
+ *           enum: [Excelling, Thriving, Struggling, In-crisis]
+ *         description: Filter students by classification type
+ *         example: Struggling
+ *       - in: query
+ *         name: isFlagged
+ *         schema:
+ *           type: boolean
+ *         description: Filter students by flagged status
+ *         example: true
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Maximum number of records to return
+ *         example: 20
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Classification ID of the last item from the previous page (for pagination)
+ *         example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
  *     responses:
  *       "200":
- *         description: Logout successful
+ *         description: Students fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -51,45 +70,111 @@ const userController = new UserController(userService);
  *                   example: true
  *                 code:
  *                   type: string
- *                   example: LOGOUT_SUCCESS
+ *                   example: FETCHED_SUCCESSFULLY
  *                 message:
  *                   type: string
- *                   example: Counselor logged out successfully.
+ *                   example: Students fetched successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     classifications:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           classification_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+ *                           student_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 7b9d5f8c-1234-5678-90ab-cdef12345678
+ *                           classification:
+ *                             type: string
+ *                             enum: [Excelling, Thriving, Struggling, In-crisis]
+ *                             example: Struggling
+ *                           is_flagged:
+ *                             type: boolean
+ *                             example: true
+ *                           classified_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2025-10-21T12:08:11.853Z
+ *                           user_name:
+ *                             type: string
+ *                             example: John Doe
+ *                           email:
+ *                             type: string
+ *                             description: Anonymized email address
+ *                             example: j****e@umak.edu.ph
+ *                           department_id:
+ *                             type: integer
+ *                             example: 1
+ *                           department_name:
+ *                             type: string
+ *                             example: Computer Science
+ *                     hasMore:
+ *                       type: boolean
+ *                       description: Indicates if there are more records available
+ *                       example: true
+ *                     nextCursor:
+ *                       type: string
+ *                       format: uuid
+ *                       description: Classification ID to use for fetching the next page
+ *                       example: 8c3b6d9a-4321-8765-09ba-fedc87654321
  *             examples:
- *               logoutSuccess:
+ *               successResponse:
  *                 value:
  *                   success: true
- *                   code: LOGOUT_SUCCESS
- *                   message: Counselor logged out successfully.
+ *                   code: FETCHED_SUCCESSFULLY
+ *                   message: Students fetched successfully.
+ *                   data:
+ *                     classifications:
+ *                       - classification_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+ *                         student_id: 7b9d5f8c-1234-5678-90ab-cdef12345678
+ *                         classification: Struggling
+ *                         is_flagged: true
+ *                         classified_at: 2025-10-21T12:08:11.853Z
+ *                         user_name: John Doe
+ *                         email: j****e@umak.edu.ph
+ *                         department_id: 1
+ *                         department_name: Computer Science
+ *                       - classification_id: 9d6e4a2c-5678-1234-90ab-cdef87654321
+ *                         student_id: 4f8b3c7d-9876-5432-10ba-fedc12345678
+ *                         classification: Excelling
+ *                         is_flagged: false
+ *                         classified_at: 2025-10-20T08:30:00.000Z
+ *                         user_name: Jane Smith
+ *                         email: j****h@umak.edu.ph
+ *                         department_id: 2
+ *                         department_name: Information Technology
+ *                     hasMore: true
+ *                     nextCursor: 9d6e4a2c-5678-1234-90ab-cdef87654321
  *       "400":
- *         description: Bad request - missing or invalid refresh token
+ *         description: Bad request - missing or invalid parameters
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
- *               missingRefreshToken:
+ *               missingRole:
  *                 value:
  *                   success: false
- *                   code: MISSING_REFRESH_TOKEN
- *                   message: Refresh token is required to logout.
- *               invalidRefreshToken:
- *                 value:
- *                   success: false
- *                   code: INVALID_REFRESH_TOKEN
- *                   message: Refresh token payload missing user ID.
+ *                   code: MISSING_USER_INFO
+ *                   message: User role is required.
  *       "401":
- *         description: Unauthorized - refresh token not found
+ *         description: Unauthorized - invalid or missing authentication token
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
- *               tokenNotFound:
+ *               unauthorized:
  *                 value:
  *                   success: false
- *                   code: REFRESH_TOKEN_NOT_FOUND
- *                   message: Refresh token not found or already invalidated.
+ *                   code: UNAUTHORIZED
+ *                   message: Invalid or missing authentication token.
  *       "500":
  *         description: Internal server error
  *         content:
@@ -101,7 +186,7 @@ const userController = new UserController(userService);
  *                 value:
  *                   success: false
  *                   code: INTERNAL_SERVER_ERROR
- *                   message: Internal server error
+ *                   message: Failed to fetch students
  */
 router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleFetchingAllStudents.bind(userController)));
 

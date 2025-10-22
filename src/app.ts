@@ -1,9 +1,9 @@
 /**
- * Heron Wellnest Authentication API
+ * Heron Wellnest Users API
  *
  * @file app.ts
- * @description Sets up and configures the Express application instance for the 
- * Heron Wellnest Authentication API. This file defines middleware, routes, 
+ * @description Sets up and configures the Express application instance for the
+ * Heron Wellnest Users API. This file defines middleware, routes,
  * and application-level settings. It does not start the server directly—`index.ts`
  * handles bootstrapping and listening on the port.
  *
@@ -19,7 +19,7 @@
  *
  * @author Arthur M. Artugue
  * @created 2025-08-16
- * @updated 2025-10-21
+ * @updated 2025-10-22
  */
 
 import express from 'express';
