@@ -1,5 +1,6 @@
 import { AppDataSource } from "../config/datasource.config.js";
 import type { StudentClassification, ClassificationEnum } from '../types/studentClassification.type.js';
+import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 
 /**
  * Filters for querying student classifications.
@@ -209,5 +210,133 @@ export class StudentClassificationRepository {
 
     const result = await AppDataSource.query(query, [classificationId]);
     return result.length > 0 ? result[0] : null;
+  }
+
+      async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
+    const query = `
+      WITH latest_classifications AS (
+        SELECT 
+          student_id,
+          classification,
+          is_flagged,
+          classified_at,
+          ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
+        FROM student_classification
+      ),
+      department_students AS (
+        SELECT 
+          cd.department_name,
+          COUNT(DISTINCT s.user_id) as total_students
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        WHERE s.is_deleted = false
+          AND cd.department_name = $1
+        GROUP BY cd.department_name
+      ),
+      flagged_count AS (
+        SELECT 
+          COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END) as flagged_students
+        FROM department_students ds
+        LEFT JOIN student s ON s.is_deleted = false
+        LEFT JOIN college_programs cp ON s.program_id = cp.program_id
+        LEFT JOIN college_departments cd ON cp.college_department_id = cd.department_id AND cd.department_name = ds.department_name
+        LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
+      )
+      SELECT 
+        ds.department_name,
+        ds.total_students,
+        COALESCE(fc.flagged_students, 0) as flagged_students,
+        (ds.total_students - COALESCE(fc.flagged_students, 0)) as unflagged_students,
+        ROUND(
+          (COALESCE(fc.flagged_students, 0)::numeric / 
+            NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as flagged_percentage,
+        ROUND(
+          ((ds.total_students - COALESCE(fc.flagged_students, 0))::numeric / 
+            NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as unflagged_percentage
+      FROM department_students ds
+      CROSS JOIN flagged_count fc
+    `;
+  
+    const result = await AppDataSource.query(query, [departmentName]);
+    
+    if (result.length === 0) {
+      return null;
+    }
+  
+    // Convert string numbers to actual numbers
+    return {
+      department_name: result[0].department_name,
+      total_students: parseInt(result[0].total_students, 10),
+      flagged_students: parseInt(result[0].flagged_students, 10),
+      unflagged_students: parseInt(result[0].unflagged_students, 10),
+      flagged_percentage: parseFloat(result[0].flagged_percentage) || 0,
+      unflagged_percentage: parseFloat(result[0].unflagged_percentage) || 0
+    };
+  }
+  
+  /**
+   * Get statistics for all departments
+   * Returns counts and percentages of flagged vs unflagged students per department
+   */
+  async getAllDepartmentsStatistics(): Promise<DepartmentStatistics[]> {
+    const query = `
+      WITH latest_classifications AS (
+        SELECT 
+          student_id,
+          classification,
+          is_flagged,
+          classified_at,
+          ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
+        FROM student_classification
+      ),
+      department_students AS (
+        SELECT 
+          cd.department_name,
+          COUNT(DISTINCT s.user_id) as total_students
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        WHERE s.is_deleted = false
+        GROUP BY cd.department_name
+      )
+      SELECT 
+        ds.department_name,
+        ds.total_students,
+        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0) as flagged_students,
+        (ds.total_students - COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0)) as unflagged_students,
+        ROUND(
+          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0)::numeric / 
+            NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as flagged_percentage,
+        ROUND(
+          ((ds.total_students - COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0))::numeric / 
+            NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as unflagged_percentage
+      FROM department_students ds
+      LEFT JOIN student s ON s.is_deleted = false
+      LEFT JOIN college_programs cp ON s.program_id = cp.program_id
+      LEFT JOIN college_departments cd ON cp.college_department_id = cd.department_id AND cd.department_name = ds.department_name
+      LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
+      GROUP BY ds.department_name, ds.total_students
+      ORDER BY ds.department_name ASC
+    `;
+  
+    const result = await AppDataSource.query(query);
+  
+    return result.map((row: any) => ({
+      department_name: row.department_name,
+      total_students: parseInt(row.total_students, 10),
+      flagged_students: parseInt(row.flagged_students, 10),
+      unflagged_students: parseInt(row.unflagged_students, 10),
+      flagged_percentage: parseFloat(row.flagged_percentage) || 0,
+      unflagged_percentage: parseFloat(row.unflagged_percentage) || 0
+    }));
   }
 }

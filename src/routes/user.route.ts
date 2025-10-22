@@ -455,4 +455,190 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  */
 router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userController.handleFetchingSpecificStudent.bind(userController)));
 
+/**
+ * @openapi
+ * /departments/statistics:
+ *   get:
+ *     summary: Fetch department statistics for student classifications
+ *     description: |
+ *       Retrieves statistical data about student classifications per department.
+ *       
+ *       **Role-Based Access:**
+ *       - **Admins/Super Admins**: Returns statistics for ALL departments
+ *       - **Counselors**: Returns statistics ONLY for their assigned department
+ *       
+ *       **Statistics Include:**
+ *       - Total number of students with latest classification
+ *       - Count of flagged students
+ *       - Count of unflagged students
+ *       - Percentage of flagged students
+ *       - Percentage of unflagged students
+ *       
+ *       **Note:** Only counts the most recent classification per student.
+ *     tags:
+ *       - Statistics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: Department statistics fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: FETCHED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Department statistics fetched successfully.
+ *                 data:
+ *                   oneOf:
+ *                     - type: object
+ *                       description: Single department statistics (for counselors)
+ *                       properties:
+ *                         department_name:
+ *                           type: string
+ *                           example: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
+ *                         total_students:
+ *                           type: integer
+ *                           description: Total number of students with latest classification
+ *                           example: 150
+ *                         flagged_students:
+ *                           type: integer
+ *                           description: Number of students flagged for concern
+ *                           example: 30
+ *                         unflagged_students:
+ *                           type: integer
+ *                           description: Number of students not flagged
+ *                           example: 120
+ *                         flagged_percentage:
+ *                           type: number
+ *                           format: float
+ *                           description: Percentage of flagged students
+ *                           example: 20.00
+ *                         unflagged_percentage:
+ *                           type: number
+ *                           format: float
+ *                           description: Percentage of unflagged students
+ *                           example: 80.00
+ *                     - type: array
+ *                       description: All departments statistics (for admins)
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           department_name:
+ *                             type: string
+ *                             example: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
+ *                           total_students:
+ *                             type: integer
+ *                             example: 150
+ *                           flagged_students:
+ *                             type: integer
+ *                             example: 30
+ *                           unflagged_students:
+ *                             type: integer
+ *                             example: 120
+ *                           flagged_percentage:
+ *                             type: number
+ *                             format: float
+ *                             example: 20.00
+ *                           unflagged_percentage:
+ *                             type: number
+ *                             format: float
+ *                             example: 80.00
+ *             examples:
+ *               counselorResponse:
+ *                 summary: Counselor response (single department)
+ *                 value:
+ *                   success: true
+ *                   code: FETCHED_SUCCESSFULLY
+ *                   message: Department statistics fetched successfully.
+ *                   data:
+ *                     department_name: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
+ *                     total_students: 150
+ *                     flagged_students: 30
+ *                     unflagged_students: 120
+ *                     flagged_percentage: 20.00
+ *                     unflagged_percentage: 80.00
+ *               adminResponse:
+ *                 summary: Admin response (all departments)
+ *                 value:
+ *                   success: true
+ *                   code: FETCHED_SUCCESSFULLY
+ *                   message: Department statistics fetched successfully.
+ *                   data:
+ *                     - department_name: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
+ *                       total_students: 150
+ *                       flagged_students: 30
+ *                       unflagged_students: 120
+ *                       flagged_percentage: 20.00
+ *                       unflagged_percentage: 80.00
+ *                     - department_name: COLLEGE OF ENGINEERING
+ *                       total_students: 200
+ *                       flagged_students: 45
+ *                       unflagged_students: 155
+ *                       flagged_percentage: 22.50
+ *                       unflagged_percentage: 77.50
+ *                     - department_name: COLLEGE OF BUSINESS ADMINISTRATION
+ *                       total_students: 180
+ *                       flagged_students: 25
+ *                       unflagged_students: 155
+ *                       flagged_percentage: 13.89
+ *                       unflagged_percentage: 86.11
+ *       "400":
+ *         description: Bad request - missing required information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               missingDepartment:
+ *                 value:
+ *                   success: false
+ *                   code: MISSING_DEPARTMENT_INFO
+ *                   message: Department information is required.
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value:
+ *                   success: false
+ *                   code: UNAUTHORIZED
+ *                   message: Invalid or missing authentication token.
+ *       "404":
+ *         description: Department not found (counselor's department has no data)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               notFound:
+ *                 value:
+ *                   success: false
+ *                   code: DEPARTMENT_NOT_FOUND
+ *                   message: No statistics found for the specified department.
+ *       "500":
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               serverError:
+ *                 value:
+ *                   success: false
+ *                   code: INTERNAL_SERVER_ERROR
+ *                   message: Failed to fetch department statistics
+ */
+router.get('/departments/statistics', heronAuthMiddleware, asyncHandler(userController.handleFetchingDepartmentStatistics.bind(userController)));
+
 export default router;

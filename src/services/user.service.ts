@@ -4,6 +4,7 @@ import { type PaginatedStudentClassifications, StudentClassificationRepository, 
 import type { Admin } from "../types/admin.type.js";
 import { AppError } from "../types/appError.type.js";
 import type { Counselor } from "../types/counselor.type.js";
+import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 import type { ClassificationEnum, StudentClassification } from "../types/studentClassification.type.js";
 import { comparePassword } from "../utils/crypt.util.js";
 
@@ -121,5 +122,13 @@ export class UserService {
     }
 
     return studentClassification;
+  }
+
+  public async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
+    return this.studentClassificationRepo.getDepartmentStatistics(departmentName);
+  }
+
+  public async getAllDepartmentStatistics(): Promise<DepartmentStatistics[] | null> {
+    return this.studentClassificationRepo.getAllDepartmentsStatistics();
   }
 }

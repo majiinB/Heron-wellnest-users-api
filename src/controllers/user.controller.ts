@@ -6,6 +6,7 @@ import { logger } from "../utils/logger.util.js";
 import type { ApiResponse } from "../types/apiResponse.type.js";
 import { AppError } from "../types/appError.type.js";
 import { comparePassword } from "../utils/crypt.util.js";
+import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 
 export class UserController {
   private userService: UserService;
@@ -69,6 +70,30 @@ export class UserController {
       code: "FETCHED_SUCCESSFULLY",
       message: "Student fetched successfully.",
       data: result
+    }
+
+    res.status(200).json(response);
+  }
+
+  public async handleFetchingDepartmentStatistics(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
+    const role = req.user?.role;
+    let result : DepartmentStatistics | DepartmentStatistics[] | null;
+
+    if (role === "admin" || role === "super_admin") {
+      result = await this.userService.getAllDepartmentStatistics();
+    } else if (role === "counselor") {
+      const departmentName = req.user?.college_department;
+      if (!departmentName) {
+        throw new AppError(400, "MISSING_DEPARTMENT_INFO", "Department information is required.");
+      }
+      result = await this.userService.getDepartmentStatistics(departmentName);
+    }
+
+    const response : ApiResponse = {
+      success: true,
+      code: "FETCHED_SUCCESSFULLY",
+      message: "Department statistics fetched successfully.",
+      data: result!
     }
 
     res.status(200).json(response);
