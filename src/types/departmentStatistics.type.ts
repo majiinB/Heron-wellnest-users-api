@@ -1,8 +1,14 @@
 export interface DepartmentStatistics {
   department_name: string;
   total_students: number;
-  flagged_students: number;
-  unflagged_students: number;
-  flagged_percentage: number;
-  unflagged_percentage: number;
+  excelling_count: number;
+  thriving_count: number;
+  struggling_count: number;
+  in_crisis_count: number;
+  not_classified_count: number;
+  excelling_percentage: number;
+  thriving_percentage: number;
+  struggling_percentage: number;
+  in_crisis_percentage: number;
+  not_classified_percentage: number;
 }

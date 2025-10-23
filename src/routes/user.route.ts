@@ -468,13 +468,12 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *       - **Counselors**: Returns statistics ONLY for their assigned department
  *       
  *       **Statistics Include:**
- *       - Total number of students with latest classification
- *       - Count of flagged students
- *       - Count of unflagged students
- *       - Percentage of flagged students
- *       - Percentage of unflagged students
+ *       - Total number of students in the department
+ *       - Count of students in each classification category (Excelling, Thriving, Struggling, InCrisis)
+ *       - Count of students not yet classified
+ *       - Percentage breakdown for each category
  *       
- *       **Note:** Only counts the most recent classification per student.
+ *       **Note:** Only counts the most recent classification per student. All percentages add up to 100%.
  *     tags:
  *       - Statistics
  *     security:
@@ -506,26 +505,53 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *                           example: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
  *                         total_students:
  *                           type: integer
- *                           description: Total number of students with latest classification
+ *                           description: Total number of students in the department
  *                           example: 150
- *                         flagged_students:
+ *                         excelling_count:
  *                           type: integer
- *                           description: Number of students flagged for concern
- *                           example: 30
- *                         unflagged_students:
+ *                           description: Number of students classified as Excelling
+ *                           example: 45
+ *                         thriving_count:
  *                           type: integer
- *                           description: Number of students not flagged
- *                           example: 120
- *                         flagged_percentage:
+ *                           description: Number of students classified as Thriving
+ *                           example: 60
+ *                         struggling_count:
+ *                           type: integer
+ *                           description: Number of students classified as Struggling
+ *                           example: 25
+ *                         in_crisis_count:
+ *                           type: integer
+ *                           description: Number of students classified as InCrisis
+ *                           example: 10
+ *                         not_classified_count:
+ *                           type: integer
+ *                           description: Number of students not yet classified
+ *                           example: 10
+ *                         excelling_percentage:
  *                           type: number
  *                           format: float
- *                           description: Percentage of flagged students
- *                           example: 20.00
- *                         unflagged_percentage:
+ *                           description: Percentage of students classified as Excelling
+ *                           example: 30.00
+ *                         thriving_percentage:
  *                           type: number
  *                           format: float
- *                           description: Percentage of unflagged students
- *                           example: 80.00
+ *                           description: Percentage of students classified as Thriving
+ *                           example: 40.00
+ *                         struggling_percentage:
+ *                           type: number
+ *                           format: float
+ *                           description: Percentage of students classified as Struggling
+ *                           example: 16.67
+ *                         in_crisis_percentage:
+ *                           type: number
+ *                           format: float
+ *                           description: Percentage of students classified as InCrisis
+ *                           example: 6.67
+ *                         not_classified_percentage:
+ *                           type: number
+ *                           format: float
+ *                           description: Percentage of students not yet classified
+ *                           example: 6.67
  *                     - type: array
  *                       description: All departments statistics (for admins)
  *                       items:
@@ -537,20 +563,41 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *                           total_students:
  *                             type: integer
  *                             example: 150
- *                           flagged_students:
+ *                           excelling_count:
  *                             type: integer
- *                             example: 30
- *                           unflagged_students:
+ *                             example: 45
+ *                           thriving_count:
  *                             type: integer
- *                             example: 120
- *                           flagged_percentage:
+ *                             example: 60
+ *                           struggling_count:
+ *                             type: integer
+ *                             example: 25
+ *                           in_crisis_count:
+ *                             type: integer
+ *                             example: 10
+ *                           not_classified_count:
+ *                             type: integer
+ *                             example: 10
+ *                           excelling_percentage:
  *                             type: number
  *                             format: float
- *                             example: 20.00
- *                           unflagged_percentage:
+ *                             example: 30.00
+ *                           thriving_percentage:
  *                             type: number
  *                             format: float
- *                             example: 80.00
+ *                             example: 40.00
+ *                           struggling_percentage:
+ *                             type: number
+ *                             format: float
+ *                             example: 16.67
+ *                           in_crisis_percentage:
+ *                             type: number
+ *                             format: float
+ *                             example: 6.67
+ *                           not_classified_percentage:
+ *                             type: number
+ *                             format: float
+ *                             example: 6.67
  *             examples:
  *               counselorResponse:
  *                 summary: Counselor response (single department)
@@ -560,11 +607,17 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *                   message: Department statistics fetched successfully.
  *                   data:
  *                     department_name: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
- *                     total_students: 150
- *                     flagged_students: 30
- *                     unflagged_students: 120
- *                     flagged_percentage: 20.00
- *                     unflagged_percentage: 80.00
+ *                     total_students: 1
+ *                     excelling_count: 0
+ *                     thriving_count: 0
+ *                     struggling_count: 0
+ *                     in_crisis_count: 1
+ *                     not_classified_count: 0
+ *                     excelling_percentage: 0
+ *                     thriving_percentage: 0
+ *                     struggling_percentage: 0
+ *                     in_crisis_percentage: 100
+ *                     not_classified_percentage: 0
  *               adminResponse:
  *                 summary: Admin response (all departments)
  *                 value:
@@ -574,22 +627,40 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *                   data:
  *                     - department_name: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
  *                       total_students: 150
- *                       flagged_students: 30
- *                       unflagged_students: 120
- *                       flagged_percentage: 20.00
- *                       unflagged_percentage: 80.00
+ *                       excelling_count: 45
+ *                       thriving_count: 60
+ *                       struggling_count: 25
+ *                       in_crisis_count: 10
+ *                       not_classified_count: 10
+ *                       excelling_percentage: 30.00
+ *                       thriving_percentage: 40.00
+ *                       struggling_percentage: 16.67
+ *                       in_crisis_percentage: 6.67
+ *                       not_classified_percentage: 6.67
  *                     - department_name: COLLEGE OF ENGINEERING
  *                       total_students: 200
- *                       flagged_students: 45
- *                       unflagged_students: 155
- *                       flagged_percentage: 22.50
- *                       unflagged_percentage: 77.50
+ *                       excelling_count: 50
+ *                       thriving_count: 80
+ *                       struggling_count: 40
+ *                       in_crisis_count: 20
+ *                       not_classified_count: 10
+ *                       excelling_percentage: 25.00
+ *                       thriving_percentage: 40.00
+ *                       struggling_percentage: 20.00
+ *                       in_crisis_percentage: 10.00
+ *                       not_classified_percentage: 5.00
  *                     - department_name: COLLEGE OF BUSINESS ADMINISTRATION
  *                       total_students: 180
- *                       flagged_students: 25
- *                       unflagged_students: 155
- *                       flagged_percentage: 13.89
- *                       unflagged_percentage: 86.11
+ *                       excelling_count: 60
+ *                       thriving_count: 70
+ *                       struggling_count: 30
+ *                       in_crisis_count: 10
+ *                       not_classified_count: 10
+ *                       excelling_percentage: 33.33
+ *                       thriving_percentage: 38.89
+ *                       struggling_percentage: 16.67
+ *                       in_crisis_percentage: 5.56
+ *                       not_classified_percentage: 5.56
  *       "400":
  *         description: Bad request - missing required information
  *         content:

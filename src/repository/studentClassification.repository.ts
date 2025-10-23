@@ -212,7 +212,11 @@ export class StudentClassificationRepository {
     return result.length > 0 ? result[0] : null;
   }
 
-      async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
+    /**
+   * Get statistics for students classified in a specific department
+   * Returns counts and percentages for each classification category
+   */
+  async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
     const query = `
       WITH latest_classifications AS (
         SELECT 
@@ -234,9 +238,12 @@ export class StudentClassificationRepository {
           AND cd.department_name = $1
         GROUP BY cd.department_name
       ),
-      flagged_count AS (
+      classification_counts AS (
         SELECT 
-          COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END) as flagged_students
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END) as excelling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END) as thriving_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END) as struggling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END) as in_crisis_count
         FROM department_students ds
         LEFT JOIN student s ON s.is_deleted = false
         LEFT JOIN college_programs cp ON s.program_id = cp.program_id
@@ -246,20 +253,33 @@ export class StudentClassificationRepository {
       SELECT 
         ds.department_name,
         ds.total_students,
-        COALESCE(fc.flagged_students, 0) as flagged_students,
-        (ds.total_students - COALESCE(fc.flagged_students, 0)) as unflagged_students,
+        COALESCE(cc.excelling_count, 0) as excelling_count,
+        COALESCE(cc.thriving_count, 0) as thriving_count,
+        COALESCE(cc.struggling_count, 0) as struggling_count,
+        COALESCE(cc.in_crisis_count, 0) as in_crisis_count,
+        (ds.total_students - COALESCE(cc.excelling_count, 0) - COALESCE(cc.thriving_count, 0) - COALESCE(cc.struggling_count, 0) - COALESCE(cc.in_crisis_count, 0)) as not_classified_count,
         ROUND(
-          (COALESCE(fc.flagged_students, 0)::numeric / 
-            NULLIF(ds.total_students, 0) * 100), 
+          (COALESCE(cc.excelling_count, 0)::numeric / NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as flagged_percentage,
+        ) as excelling_percentage,
         ROUND(
-          ((ds.total_students - COALESCE(fc.flagged_students, 0))::numeric / 
-            NULLIF(ds.total_students, 0) * 100), 
+          (COALESCE(cc.thriving_count, 0)::numeric / NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as unflagged_percentage
+        ) as thriving_percentage,
+        ROUND(
+          (COALESCE(cc.struggling_count, 0)::numeric / NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as struggling_percentage,
+        ROUND(
+          (COALESCE(cc.in_crisis_count, 0)::numeric / NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as in_crisis_percentage,
+        ROUND(
+          ((ds.total_students - COALESCE(cc.excelling_count, 0) - COALESCE(cc.thriving_count, 0) - COALESCE(cc.struggling_count, 0) - COALESCE(cc.in_crisis_count, 0))::numeric / NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as not_classified_percentage
       FROM department_students ds
-      CROSS JOIN flagged_count fc
+      CROSS JOIN classification_counts cc
     `;
   
     const result = await AppDataSource.query(query, [departmentName]);
@@ -268,20 +288,25 @@ export class StudentClassificationRepository {
       return null;
     }
   
-    // Convert string numbers to actual numbers
     return {
       department_name: result[0].department_name,
       total_students: parseInt(result[0].total_students, 10),
-      flagged_students: parseInt(result[0].flagged_students, 10),
-      unflagged_students: parseInt(result[0].unflagged_students, 10),
-      flagged_percentage: parseFloat(result[0].flagged_percentage) || 0,
-      unflagged_percentage: parseFloat(result[0].unflagged_percentage) || 0
+      excelling_count: parseInt(result[0].excelling_count, 10),
+      thriving_count: parseInt(result[0].thriving_count, 10),
+      struggling_count: parseInt(result[0].struggling_count, 10),
+      in_crisis_count: parseInt(result[0].in_crisis_count, 10),
+      not_classified_count: parseInt(result[0].not_classified_count, 10),
+      excelling_percentage: parseFloat(result[0].excelling_percentage) || 0,
+      thriving_percentage: parseFloat(result[0].thriving_percentage) || 0,
+      struggling_percentage: parseFloat(result[0].struggling_percentage) || 0,
+      in_crisis_percentage: parseFloat(result[0].in_crisis_percentage) || 0,
+      not_classified_percentage: parseFloat(result[0].not_classified_percentage) || 0
     };
   }
   
   /**
    * Get statistics for all departments
-   * Returns counts and percentages of flagged vs unflagged students per department
+   * Returns counts and percentages for each classification category per department
    */
   async getAllDepartmentsStatistics(): Promise<DepartmentStatistics[]> {
     const query = `
@@ -307,18 +332,45 @@ export class StudentClassificationRepository {
       SELECT 
         ds.department_name,
         ds.total_students,
-        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0) as flagged_students,
-        (ds.total_students - COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0)) as unflagged_students,
+        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) as excelling_count,
+        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) as thriving_count,
+        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) as struggling_count,
+        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0) as in_crisis_count,
+        (ds.total_students - 
+          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) -
+          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) -
+          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) -
+          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)
+        ) as not_classified_count,
         ROUND(
-          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0)::numeric / 
-            NULLIF(ds.total_students, 0) * 100), 
+          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0)::numeric / 
+           NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as flagged_percentage,
+        ) as excelling_percentage,
         ROUND(
-          ((ds.total_students - COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.is_flagged = true THEN latest_sc.student_id END), 0))::numeric / 
-            NULLIF(ds.total_students, 0) * 100), 
+          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0)::numeric / 
+           NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as unflagged_percentage
+        ) as thriving_percentage,
+        ROUND(
+          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0)::numeric / 
+           NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as struggling_percentage,
+        ROUND(
+          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)::numeric / 
+           NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as in_crisis_percentage,
+        ROUND(
+          ((ds.total_students - 
+            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) -
+            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) -
+            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) -
+            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)
+          )::numeric / NULLIF(ds.total_students, 0) * 100), 
+          2
+        ) as not_classified_percentage
       FROM department_students ds
       LEFT JOIN student s ON s.is_deleted = false
       LEFT JOIN college_programs cp ON s.program_id = cp.program_id
@@ -333,10 +385,16 @@ export class StudentClassificationRepository {
     return result.map((row: any) => ({
       department_name: row.department_name,
       total_students: parseInt(row.total_students, 10),
-      flagged_students: parseInt(row.flagged_students, 10),
-      unflagged_students: parseInt(row.unflagged_students, 10),
-      flagged_percentage: parseFloat(row.flagged_percentage) || 0,
-      unflagged_percentage: parseFloat(row.unflagged_percentage) || 0
+      excelling_count: parseInt(row.excelling_count, 10),
+      thriving_count: parseInt(row.thriving_count, 10),
+      struggling_count: parseInt(row.struggling_count, 10),
+      in_crisis_count: parseInt(row.in_crisis_count, 10),
+      not_classified_count: parseInt(row.not_classified_count, 10),
+      excelling_percentage: parseFloat(row.excelling_percentage) || 0,
+      thriving_percentage: parseFloat(row.thriving_percentage) || 0,
+      struggling_percentage: parseFloat(row.struggling_percentage) || 0,
+      in_crisis_percentage: parseFloat(row.in_crisis_percentage) || 0,
+      not_classified_percentage: parseFloat(row.not_classified_percentage) || 0
     }));
   }
 }
