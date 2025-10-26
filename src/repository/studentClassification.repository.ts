@@ -30,7 +30,6 @@ export class StudentClassificationRepository {
     async findAll(filters: StudentClassificationFilters = {}): Promise<PaginatedStudentClassifications> {
     const {
       classification,
-      isFlagged,
       departmentName,
       limit = 10,
       cursor
@@ -43,11 +42,6 @@ export class StudentClassificationRepository {
     if (classification) {
       conditions.push(`latest_sc.classification = $${paramIndex++}`);
       parameters.push(classification);
-    }
-  
-    if (isFlagged !== undefined) {
-      conditions.push(`latest_sc.is_flagged = $${paramIndex++}`);
-      parameters.push(isFlagged);
     }
   
     if (departmentName !== undefined) {
@@ -73,7 +67,6 @@ export class StudentClassificationRepository {
           classification_id,
           student_id,
           classification,
-          is_flagged,
           classified_at,
           ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
         FROM student_classification
@@ -82,7 +75,6 @@ export class StudentClassificationRepository {
         latest_sc.classification_id,
         latest_sc.student_id,
         latest_sc.classification,
-        latest_sc.is_flagged,
         latest_sc.classified_at,
         s.email,
         cd.department_name
@@ -116,11 +108,10 @@ export class StudentClassificationRepository {
         sc.classification_id,
         sc.student_id,
         sc.classification,
-        sc.is_flagged,
         sc.classified_at,
         s.user_name,
         s.email,
-        cp.college_department_id as department_id,
+        cd.department_id,
         cp.program_name,
         cd.department_name
       FROM student_classification sc
@@ -194,11 +185,10 @@ export class StudentClassificationRepository {
         sc.classification_id,
         sc.student_id,
         sc.classification,
-        sc.is_flagged,
         sc.classified_at,
         s.user_name,
         s.email,
-        cp.college_department_id as department_id,
+        cd.department_id,
         cd.department_name
       FROM student_classification sc
       INNER JOIN student s ON sc.student_id = s.user_id
@@ -222,7 +212,6 @@ export class StudentClassificationRepository {
         SELECT 
           student_id,
           classification,
-          is_flagged,
           classified_at,
           ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
         FROM student_classification
@@ -314,7 +303,6 @@ export class StudentClassificationRepository {
         SELECT 
           student_id,
           classification,
-          is_flagged,
           classified_at,
           ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
         FROM student_classification

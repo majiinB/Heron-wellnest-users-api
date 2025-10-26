@@ -24,7 +24,6 @@ export class UserController {
 
     // Get query parameters
     const classification = req.query.classification as ClassificationEnum | undefined;
-    const isFlagged = req.query.isFlagged === 'true' ? true : req.query.isFlagged === 'false' ? false : undefined;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     const cursor = req.query.cursor as string | undefined;
 
@@ -36,7 +35,6 @@ export class UserController {
       classification,
       limit,
       cursor,
-      isFlagged
     );
 
     const response : ApiResponse = {

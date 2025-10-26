@@ -32,12 +32,12 @@ export interface StudentClassification {
   classification_id: string;
   student_id: string;
   classification: ClassificationEnum;
-  is_flagged: boolean;
   classified_at: Date;
   email: string;
   department_id: number;
   program_name: string;
   department_name: string;
+  user_name?: string;
   mood_check_ins?: MoodCheckIn[];
 }
 

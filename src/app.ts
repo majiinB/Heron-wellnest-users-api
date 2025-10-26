@@ -42,7 +42,7 @@ const swaggerOptions = {
     openapi: '3.0.0',
     info: {
       title: 'Heron Wellnest Users API',
-      version: '1.0.0',
+      version: '1.0.1',
       description: "Heron Wellnest Users API provides secure endpoints for managing users or students withing the system. This API requires administrative privileges to access its resources.",
     },
     servers: [

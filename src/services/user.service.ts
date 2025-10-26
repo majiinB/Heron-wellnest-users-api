@@ -7,6 +7,7 @@ import type { Counselor } from "../types/counselor.type.js";
 import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 import type { ClassificationEnum, StudentClassification } from "../types/studentClassification.type.js";
 import { comparePassword } from "../utils/crypt.util.js";
+import { logger } from "../utils/logger.util.js";
 
 export class UserService {
   private studentClassificationRepo: StudentClassificationRepository;
@@ -39,13 +40,11 @@ export class UserService {
     classification?: ClassificationEnum, 
     limit?: number, 
     cursor?: string, 
-    isFlagged?: boolean
   ): Promise<PaginatedStudentClassifications> {
 
     const filters: StudentClassificationFilters = {
       departmentName: college_department,
       classification,
-      isFlagged,
       limit,
       cursor,
     };
@@ -110,7 +109,8 @@ export class UserService {
           true
         ); 
       }
-      
+      logger.info(studentClassification?.department_id);
+      logger.info(counselor.department_id);
       if ((studentClassification?.department_id !== counselor.department_id)) {
         throw new AppError(
           403,

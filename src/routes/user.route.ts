@@ -57,12 +57,6 @@ const userController = new UserController(userService);
  *         description: Filter students by classification type
  *         example: Struggling
  *       - in: query
- *         name: isFlagged
- *         schema:
- *           type: boolean
- *         description: Filter students by flagged status
- *         example: true
- *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
