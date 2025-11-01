@@ -32,12 +32,13 @@ export interface StudentClassification {
   classification_id: string;
   student_id: string;
   classification: ClassificationEnum;
+  classification_probabilities: ClassificationProbabilities;
   classified_at: Date;
+  user_name: string;
   email: string;
-  department_id: number;
-  program_name: string;
+  department_id: string;
+  program_name?: string;
   department_name: string;
-  user_name?: string;
   mood_check_ins?: MoodCheckIn[];
 }
 
@@ -47,4 +48,11 @@ export interface MoodCheckIn {
   mood_2: string;
   mood_3: string;
   checked_in_at: Date;
+}
+
+export interface ClassificationProbabilities {
+  InCrisis: number;
+  Thriving: number;
+  Excelling: number;
+  Struggling: number;
 }

@@ -87,10 +87,10 @@ export class UserService {
       }
     }
 
-    const studentClassification : StudentClassification | null = await this.studentClassificationRepo.findByStudentId(studentId);
+    let counselor: Counselor | null = null;
 
     if (role === "counselor") {
-      const counselor : Counselor | null = await this.counselorRepository.findByEmail(email);
+      counselor = await this.counselorRepository.findByEmail(email);
 
       if (!counselor) {
         throw new AppError(
@@ -109,16 +109,17 @@ export class UserService {
           true
         ); 
       }
-      logger.info(studentClassification?.department_id);
-      logger.info(counselor.department_id);
-      if ((studentClassification?.department_id !== counselor.department_id)) {
-        throw new AppError(
-          403,
-          "FORBIDDEN_ACCESS",
-          "You do not have permission to access this student's information.",
-          true
-        ); 
-      }
+    }
+
+    const studentClassification : StudentClassification | null = await this.studentClassificationRepo.findByStudentId(studentId);
+
+    if (role === "counselor" && studentClassification?.department_id !== counselor?.department_id) {
+      throw new AppError(
+        403,
+        "FORBIDDEN_ACCESS",
+        "You do not have permission to access this student's information.",
+        true
+      ); 
     }
 
     return studentClassification;

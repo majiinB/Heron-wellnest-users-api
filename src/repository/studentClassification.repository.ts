@@ -1,5 +1,5 @@
 import { AppDataSource } from "../config/datasource.config.js";
-import type { StudentClassification, ClassificationEnum } from '../types/studentClassification.type.js';
+import type { StudentClassification, ClassificationEnum, MoodCheckIn } from '../types/studentClassification.type.js';
 import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 
 /**
@@ -12,6 +12,7 @@ import type { DepartmentStatistics } from "../types/departmentStatistics.type.js
  * @property {number} [limit] - Maximum number of results to return
  * @property {string} [cursor] - Classification ID of the last item from the previous page for pagination
  */
+
 export interface StudentClassificationFilters {
   classification?: ClassificationEnum;
   isFlagged?: boolean;
@@ -27,7 +28,7 @@ export type PaginatedStudentClassifications = {
 }
 
 export class StudentClassificationRepository {
-    async findAll(filters: StudentClassificationFilters = {}): Promise<PaginatedStudentClassifications> {
+  public async findAll(filters: StudentClassificationFilters = {}): Promise<PaginatedStudentClassifications> {
     const {
       classification,
       departmentName,
@@ -67,6 +68,7 @@ export class StudentClassificationRepository {
           classification_id,
           student_id,
           classification,
+          classification_probabilities,
           classified_at,
           ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY classified_at DESC, classification_id DESC) as rn
         FROM student_classification
@@ -75,6 +77,7 @@ export class StudentClassificationRepository {
         latest_sc.classification_id,
         latest_sc.student_id,
         latest_sc.classification,
+        latest_sc.classification_probabilities,
         latest_sc.classified_at,
         s.email,
         cd.department_name
@@ -101,13 +104,14 @@ export class StudentClassificationRepository {
     };
   }
 
-    async findByStudentId(studentId: string): Promise<StudentClassification | null> {
+  public async findByStudentId(studentId: string): Promise<StudentClassification | null> {
     // First, get the student classification details
     const classificationQuery = `
       SELECT 
         sc.classification_id,
         sc.student_id,
         sc.classification,
+        sc.classification_probabilities,
         sc.classified_at,
         s.user_name,
         s.email,
@@ -179,12 +183,13 @@ export class StudentClassificationRepository {
     return this.findAll({ departmentName, limit, cursor });
   }
 
-  async findById(classificationId: string): Promise<StudentClassification | null> {
+  public async findById(classificationId: string): Promise<StudentClassification | null> {
     const query = `
       SELECT 
         sc.classification_id,
         sc.student_id,
         sc.classification,
+        sc.classification_probabilities,
         sc.classified_at,
         s.user_name,
         s.email,
@@ -192,7 +197,7 @@ export class StudentClassificationRepository {
         cd.department_name
       FROM student_classification sc
       INNER JOIN student s ON sc.student_id = s.user_id
-      INNER JOIN college_programs cp ON s.college_program = cp.program_id
+      INNER JOIN college_programs cp ON s.program_id = cp.program_id
       INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
       WHERE sc.classification_id = $1
         AND s.is_deleted = false
@@ -206,7 +211,7 @@ export class StudentClassificationRepository {
    * Get statistics for students classified in a specific department
    * Returns counts and percentages for each classification category
    */
-  async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
+  public async getDepartmentStatistics(departmentName: string): Promise<DepartmentStatistics | null> {
     const query = `
       WITH latest_classifications AS (
         SELECT 

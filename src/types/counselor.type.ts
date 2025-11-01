@@ -4,7 +4,7 @@ export interface Counselor {
   email: string;
   password: string;
   is_deleted: boolean;
-  department_id: number;
+  department_id: string;
   created_at: Date;
   updated_at: Date;
 }
