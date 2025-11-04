@@ -77,7 +77,7 @@ export class UserService {
         ); 
       }
 
-      if (!comparePassword(password, admin.password)) {
+      if (!await comparePassword(password, admin.password)) {
         throw new AppError(
           401,
           "INVALID_CREDENTIALS",
@@ -90,6 +90,7 @@ export class UserService {
     let counselor: Counselor | null = null;
 
     if (role === "counselor") {
+
       counselor = await this.counselorRepository.findByEmail(email);
 
       if (!counselor) {
@@ -101,7 +102,7 @@ export class UserService {
         ); 
       }
 
-      if (!comparePassword(password, counselor.password)) {
+      if (!await comparePassword(password, counselor.password)) {
         throw new AppError(
           401,
           "INVALID_CREDENTIALS",
