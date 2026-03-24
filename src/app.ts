@@ -30,6 +30,7 @@ import {corsOptions} from './config/cors.config.js';
 import { loggerMiddleware } from './middlewares/logger.middleware.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 import userRoute from './routes/user.route.js';
+import userManagementRoute from './routes/userManagement.route.js';
 import { env } from './config/env.config.js';
 import fs from 'fs';
 
@@ -78,6 +79,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routess
 app.use('/api/v1/users', userRoute);
+app.use('/api/v1/users/management', userManagementRoute);
 
 // This is a health check route
 app.get('/api/v1/users/health', (_req, res) => {

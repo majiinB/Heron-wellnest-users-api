@@ -1,7 +1,51 @@
 import { AppDataSource } from "../config/datasource.config.js";
-import type { Counselor } from "../types/counselor.type.js";
+import type { Counselor, CounselorListItem, PaginatedCounselors } from "../types/counselor.type.js";
 
 export class CounselorRepository {
+  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedCounselors> {
+    const parameters: (string | number)[] = [];
+    let paramIndex = 1;
+    const conditions: string[] = ["c.is_deleted = false"];
+
+    if (cursor) {
+      conditions.push(`(c.created_at, c.user_id) < (
+        SELECT created_at, user_id
+        FROM counselor
+        WHERE user_id = $${paramIndex++}
+      )`);
+      parameters.push(cursor);
+    }
+
+    const query = `
+      SELECT
+        c.user_id,
+        c.user_name,
+        c.email,
+        c.department_id,
+        cd.department_name,
+        c.created_at,
+        c.updated_at
+      FROM counselor c
+      INNER JOIN college_departments cd ON c.department_id = cd.department_id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY c.created_at DESC, c.user_id DESC
+      LIMIT $${paramIndex}
+    `;
+
+    parameters.push(limit + 1);
+
+    const data: CounselorListItem[] = await AppDataSource.query(query, parameters);
+    const hasMore = data.length > limit;
+    const counselors = hasMore ? data.slice(0, limit) : data;
+    const nextCursor = hasMore ? counselors[counselors.length - 1].user_id : undefined;
+
+    return {
+      counselors,
+      hasMore,
+      nextCursor,
+    };
+  }
+
   /**
    * Find a counselor by email (for login/authentication)
    * Returns null if counselor not found or is deleted

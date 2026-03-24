@@ -7,7 +7,6 @@ import type { Counselor } from "../types/counselor.type.js";
 import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 import type { ClassificationEnum, StudentClassification } from "../types/studentClassification.type.js";
 import { comparePassword } from "../utils/crypt.util.js";
-import { logger } from "../utils/logger.util.js";
 
 export class UserService {
   private studentClassificationRepo: StudentClassificationRepository;

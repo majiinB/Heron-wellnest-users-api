@@ -10,3 +10,19 @@ export interface Counselor {
 }
 
 export type SafeCounselor = Omit<Counselor, 'password'>;
+
+export interface CounselorListItem {
+  user_id: string;
+  user_name: string;
+  email: string;
+  department_id: string;
+  department_name: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface PaginatedCounselors {
+  counselors: CounselorListItem[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
