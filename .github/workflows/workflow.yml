@@ -83,6 +83,23 @@ jobs:
       - run: |
           echo "JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }}"
 
+      # Create env-vars YAML file
+      - run: |
+          cat > env-vars.yaml <<EOF
+          NODE_ENV: ${{ toJSON(vars.NODE_ENV) }}
+          DB_USER: ${{ toJSON(vars.DB_USER) }}
+          DB_NAME: ${{ toJSON(vars.DB_NAME) }}
+          DB_HOST: ${{ toJSON(vars.DB_HOST) }}
+          DB_PORT: ${{ toJSON(vars.DB_PORT) }}
+          GOOGLE_EMAIL_DOMAIN: ${{ toJSON(vars.GOOGLE_EMAIL_DOMAIN) }}
+          JWT_ACCESS_TOKEN_TTL: ${{ toJSON(vars.JWT_ACCESS_TOKEN_TTL) }}
+          JWT_REFRESH_TOKEN_TTL: ${{ toJSON(vars.JWT_REFRESH_TOKEN_TTL) }}
+          JWT_ISSUER: ${{ toJSON(vars.JWT_ISSUER) }}
+          JWT_AUDIENCE: ${{ toJSON(vars.JWT_AUDIENCE) }}
+          JWT_ALGORITHM: ${{ toJSON(vars.JWT_ALGORITHM) }}
+          CORS_ALLOWED_ORIGINS: ${{ toJSON(vars.CORS_ALLOWED_ORIGINS) }}
+          EOF
+
       # Deploy to Cloud Run
       - run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -90,18 +107,7 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --update-env-vars NODE_ENV=${{ vars.NODE_ENV }} \
-            --update-env-vars DB_USER=${{ vars.DB_USER }} \
-            --update-env-vars DB_NAME=${{ vars.DB_NAME }} \
-            --update-env-vars DB_HOST=${{ vars.DB_HOST }} \
-            --update-env-vars DB_PORT=${{ vars.DB_PORT }} \
-            --update-env-vars GOOGLE_EMAIL_DOMAIN=${{ vars.GOOGLE_EMAIL_DOMAIN }} \
-            --update-env-vars JWT_ACCESS_TOKEN_TTL=${{ vars.JWT_ACCESS_TOKEN_TTL }} \
-            --update-env-vars JWT_REFRESH_TOKEN_TTL=${{ vars.JWT_REFRESH_TOKEN_TTL }} \
-            --update-env-vars JWT_ISSUER=${{ vars.JWT_ISSUER }} \
-            --update-env-vars JWT_AUDIENCE=${{ vars.JWT_AUDIENCE }} \
-            --update-env-vars JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }} \
-            --update-env-vars CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }} \
+            --env-vars-file env-vars.yaml \
             --set-secrets DB_PASSWORD=DB_PASSWORD:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,JWT_SECRET=JWT_SECRET:latest \
             --timeout=300 \
             --concurrency=20 \
