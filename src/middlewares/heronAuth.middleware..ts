@@ -53,6 +53,104 @@ export async function heronAuthMiddleware(req: AuthenticatedRequest, res: Respon
   }
 }
 
+export async function heronAuthMiddlewareAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const authHeader : string | undefined = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new AppError(
+        401, 
+        "AUTH_NO_TOKEN", 
+        "No token provided", 
+        true
+      );
+    }
+
+    const token: string = authHeader.split(" ")[1];
+    
+    const payload : AccessTokenClaims = await verifyToken(token);
+    
+    if(!payload.email || !payload.name || !payload.sub || !payload.role) {
+      throw new AppError(
+        401,
+        "AUTH_INVALID_TOKEN",
+        "Token is missing required fields",
+        true
+      );
+    }
+
+    if(payload.role !== "admin" && payload.role !== "super_admin") {
+      throw new AppError(
+        403,
+        "AUTH_FORBIDDEN",
+        "The user does not have permission to access this resource",
+        true
+      );
+    }
+
+    // Attach user info to request object
+    req.user = {
+      email: payload.email!,
+      name: payload.name!,
+      sub: payload.sub!,
+      role: payload.role!,
+      college_department: (payload.role !== "admin" && payload.role !== "super_admin") ? payload.college_department! : undefined,
+    };
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function heronAuthMiddlewareSuperAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const authHeader : string | undefined = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new AppError(
+        401, 
+        "AUTH_NO_TOKEN", 
+        "No token provided", 
+        true
+      );
+    }
+
+    const token: string = authHeader.split(" ")[1];
+    
+    const payload : AccessTokenClaims = await verifyToken(token);
+    
+    if(!payload.email || !payload.name || !payload.sub || !payload.role) {
+      throw new AppError(
+        401,
+        "AUTH_INVALID_TOKEN",
+        "Token is missing required fields",
+        true
+      );
+    }
+
+    if(payload.role !== "super_admin") {
+      throw new AppError(
+        403,
+        "AUTH_FORBIDDEN",
+        "The user does not have permission to access this resource",
+        true
+      );
+    }
+
+    // Attach user info to request object
+    req.user = {
+      email: payload.email!,
+      name: payload.name!,
+      sub: payload.sub!,
+      role: payload.role!,
+      college_department: undefined,
+    };
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function heronAuthMiddlewareStudent(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader : string | undefined = req.headers.authorization;
