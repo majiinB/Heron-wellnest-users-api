@@ -1,6 +1,7 @@
 import express from "express";
 import { asyncHandler } from "../utils/asyncHandler.util.js";
-import { heronAuthMiddleware } from "../middlewares/heronAuth.middleware..js";
+import { heronAuthMiddleware, heronAuthMiddlewareAdmin, heronAuthMiddlewareSuperAdmin } from "../middlewares/heronAuth.middleware..js";
+import { AdminRepository } from "../repository/admin.repository.js";
 import { CounselorRepository } from "../repository/counselor.repository.js";
 import { StudentRepository } from "../repository/student.repository.js";
 import { UserManagementService } from "../services/userManagement.service.js";
@@ -8,9 +9,10 @@ import { UserManagementController } from "../controllers/userManagement.controll
 
 const router = express.Router();
 
+const adminRepository = new AdminRepository();
 const counselorRepository = new CounselorRepository();
 const studentRepository = new StudentRepository();
-const userManagementService = new UserManagementService(counselorRepository, studentRepository);
+const userManagementService = new UserManagementService(counselorRepository, studentRepository, adminRepository);
 const userManagementController = new UserManagementController(userManagementService);
 
 /**
@@ -367,6 +369,198 @@ router.get(
 	"/students",
 	heronAuthMiddleware,
 	asyncHandler(userManagementController.handleFetchPaginatedStudents.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/admins:
+ *   post:
+ *     summary: Create a new admin user
+ *     description: |
+ *       Creates a new admin account.
+ *
+ *       **Authorization Requirements:**
+ *       - **Super Admins**: Allowed
+ *       - **Admins/Counselors/Students**: Forbidden
+ *     tags:
+ *       - User Management
+ *       - Admins
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_name
+ *               - email
+ *               - password
+ *             properties:
+ *               user_name:
+ *                 type: string
+ *                 example: Jane Admin
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jane.admin@wellnest.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: SecurePass123!
+ *               is_super_admin:
+ *                 type: boolean
+ *                 default: false
+ *                 example: false
+ *     responses:
+ *       "201":
+ *         description: Admin created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: CREATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Admin created successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                     user_name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                     is_super_admin:
+ *                       type: boolean
+ *                     is_deleted:
+ *                       type: boolean
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *       "400":
+ *         description: Bad request - missing required fields or invalid field types
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - only super admins can create admins
+ *       "500":
+ *         description: Internal server error
+ */
+router.post(
+	"/admins",
+	heronAuthMiddlewareSuperAdmin,
+	asyncHandler(userManagementController.handleCreateAdmin.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/counselors:
+ *   post:
+ *     summary: Create a new counselor user
+ *     description: |
+ *       Creates a new counselor account and assigns it to a department.
+ *
+ *       **Authorization Requirements:**
+ *       - **Admins/Super Admins**: Allowed
+ *       - **Counselors/Students**: Forbidden
+ *     tags:
+ *       - User Management
+ *       - Counselors
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_name
+ *               - email
+ *               - password
+ *               - department_id
+ *             properties:
+ *               user_name:
+ *                 type: string
+ *                 example: Dr. John Counselor
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: counselor@wellnest.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: SecurePass123!
+ *               department_id:
+ *                 type: string
+ *                 format: uuid
+ *                 example: e2c087e6-e7ec-4f34-a215-b8a67b3a9d92
+ *     responses:
+ *       "201":
+ *         description: Counselor created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: CREATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Counselor created successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                     user_name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                     is_deleted:
+ *                       type: boolean
+ *                     department_id:
+ *                       type: string
+ *                       format: uuid
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *       "400":
+ *         description: Bad request - missing required fields or invalid field types
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - only admins can create counselors
+ *       "500":
+ *         description: Internal server error
+ */
+router.post(
+	"/counselors",
+	heronAuthMiddlewareAdmin,
+	asyncHandler(userManagementController.handleCreateCounselor.bind(userManagementController)),
 );
 
 export default router;
