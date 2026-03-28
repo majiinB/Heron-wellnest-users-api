@@ -1,4 +1,6 @@
 import { AppDataSource } from "../config/datasource.config.js";
+import { hashPassword } from "../utils/crypt.util.js";
+import { v4 as uuidv4 } from "uuid";
 import type { Counselor, CounselorListItem, PaginatedCounselors } from "../types/counselor.type.js";
 
 export class CounselorRepository {
@@ -231,4 +233,59 @@ export class CounselorRepository {
   const result = await AppDataSource.query(query);
   return result;
 }
+
+  /**
+   * Create a new counselor
+   * @param user_name - Counselor's name
+   * @param email - Counselor's email
+   * @param password - Plain text password (will be hashed)
+   * @param department_id - The department ID the counselor belongs to
+   * @returns The created counselor without password
+   */
+  async create(
+    user_name: string,
+    email: string,
+    password: string,
+    department_id: string
+  ): Promise<Omit<Counselor, 'password'> | null> {
+    // Check if email already exists
+    const existingCounselor = await this.findByEmail(email);
+    if (existingCounselor) {
+      throw new Error(`Counselor with email ${email} already exists`);
+    }
+
+    const userId = uuidv4();
+    const hashedPassword = await hashPassword(password);
+
+    const query = `
+      INSERT INTO counselor (
+        user_id,
+        user_name,
+        email,
+        password,
+        department_id,
+        is_deleted,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW())
+      RETURNING 
+        user_id,
+        user_name,
+        email,
+        is_deleted,
+        department_id,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [
+      userId,
+      user_name,
+      email,
+      hashedPassword,
+      department_id,
+    ]);
+
+    return result.length > 0 ? result[0] : null;
+  }
 }

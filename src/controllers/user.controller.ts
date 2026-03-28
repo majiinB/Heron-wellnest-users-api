@@ -1,11 +1,9 @@
-import type {Response, Request, NextFunction } from "express";
+import type {Response, NextFunction } from "express";
 import { UserService } from "../services/user.service.js";
 import type { AuthenticatedRequest } from "../interface/authRequest.interface.js";
 import type { ClassificationEnum } from "../types/studentClassification.type.js";
-import { logger } from "../utils/logger.util.js";
 import type { ApiResponse } from "../types/apiResponse.type.js";
 import { AppError } from "../types/appError.type.js";
-import { comparePassword } from "../utils/crypt.util.js";
 import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 
 export class UserController {
