@@ -374,6 +374,116 @@ router.get(
 /**
  * @openapi
  * /management/admins:
+ *   get:
+ *     summary: Fetch all admins for user management
+ *     description: |
+ *       Retrieves a paginated list of admins for admin user management.
+ *
+ *       **Authorization Requirements:**
+ *       - **Admins/Super Admins**: Allowed
+ *       - **Counselors/Students**: Forbidden
+ *
+ *       **Pagination:**
+ *       - Uses cursor-based pagination with `limit` and `cursor`
+ *       - `nextCursor` contains the `user_id` of the last admin in the current page
+ *     tags:
+ *       - User Management
+ *       - Admins
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Maximum number of admin records to return
+ *         example: 10
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Admin user_id of the last item from the previous page
+ *         example: ac57c94e-f6c8-4e10-b7ac-c364538195dc
+ *     responses:
+ *       "200":
+ *         description: Admins fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: FETCHED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Admins fetched successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     admins:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           user_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: ac57c94e-f6c8-4e10-b7ac-c364538195dc
+ *                           user_name:
+ *                             type: string
+ *                             example: Jane Admin
+ *                           email:
+ *                             type: string
+ *                             format: email
+ *                             example: admin@wellnest.com
+ *                           is_super_admin:
+ *                             type: boolean
+ *                             example: false
+ *                           is_deleted:
+ *                             type: boolean
+ *                             example: false
+ *                           created_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2025-10-17T21:19:32.713Z
+ *                           updated_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2025-10-17T21:19:32.713Z
+ *                     hasMore:
+ *                       type: boolean
+ *                       example: false
+ *                     nextCursor:
+ *                       type: string
+ *                       format: uuid
+ *                       nullable: true
+ *                       example: null
+ *       "400":
+ *         description: Bad request - invalid query parameters or missing user info
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - only admins can access this resource
+ *       "500":
+ *         description: Internal server error
+ */
+router.get(
+	"/admins",
+	heronAuthMiddlewareAdmin,
+	asyncHandler(userManagementController.handleFetchPaginatedAdmins.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/admins:
  *   post:
  *     summary: Create a new admin user
  *     description: |
@@ -561,6 +671,56 @@ router.post(
 	"/counselors",
 	heronAuthMiddlewareAdmin,
 	asyncHandler(userManagementController.handleCreateCounselor.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/admins/{adminId}:
+ *   patch:
+ *     summary: Update admin basic information
+ *     description: |
+ *       Updates an admin's basic information.
+ *
+ *       **Authorization Rules:**
+ *       - **Admin**: Can only update their own info
+ *       - **Super Admin**: Can update own info and non-super-admin accounts
+ *       - **Super Admin cannot update other Super Admin accounts**
+ *     tags:
+ *       - User Management
+ *       - Admins
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch(
+	"/admins/:adminId",
+	heronAuthMiddlewareAdmin,
+	asyncHandler(userManagementController.handleUpdateAdmin.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/admins/{adminId}/password:
+ *   patch:
+ *     summary: Update admin password
+ *     description: |
+ *       Updates an admin password.
+ *
+ *       **Authorization Rules:**
+ *       - **Admin**: Can only update their own password and must provide previous_password
+ *       - **Super Admin**: Can update own password and non-super-admin passwords
+ *       - **Super Admin cannot update other Super Admin passwords**
+ *
+ *       Note: Super-admin initiated password changes for other admins will notify the user.
+ *     tags:
+ *       - User Management
+ *       - Admins
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch(
+	"/admins/:adminId/password",
+	heronAuthMiddlewareAdmin,
+	asyncHandler(userManagementController.handleUpdateAdminPassword.bind(userManagementController)),
 );
 
 export default router;

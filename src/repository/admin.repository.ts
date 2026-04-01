@@ -1,9 +1,52 @@
 import { AppDataSource } from "../config/datasource.config.js";
 import { hashPassword } from "../utils/crypt.util.js";
 import { v4 as uuidv4 } from "uuid";
-import type { Admin } from "../types/admin.type.js";
+import type { Admin, AdminListItem, PaginatedAdmins } from "../types/admin.type.js";
 
 export class AdminRepository {
+  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedAdmins> {
+    const parameters: (string | number)[] = [];
+    let paramIndex = 1;
+    const conditions: string[] = ["a.is_deleted = false"];
+
+    if (cursor) {
+      conditions.push(`(a.created_at, a.user_id) < (
+        SELECT created_at, user_id
+        FROM admin
+        WHERE user_id = $${paramIndex++}
+      )`);
+      parameters.push(cursor);
+    }
+
+    const query = `
+      SELECT
+        a.user_id,
+        a.user_name,
+        a.email,
+        a.is_super_admin,
+        a.is_deleted,
+        a.created_at,
+        a.updated_at
+      FROM admin a
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY a.created_at DESC, a.user_id DESC
+      LIMIT $${paramIndex}
+    `;
+
+    parameters.push(limit + 1);
+
+    const data: AdminListItem[] = await AppDataSource.query(query, parameters);
+    const hasMore = data.length > limit;
+    const admins = hasMore ? data.slice(0, limit) : data;
+    const nextCursor = hasMore ? admins[admins.length - 1].user_id : undefined;
+
+    return {
+      admins,
+      hasMore,
+      nextCursor,
+    };
+  }
+
   /**
    * Find an admin by email (for login/authentication)
    * Returns null if admin not found or is deleted
@@ -128,6 +171,69 @@ export class AdminRepository {
 
     const result = await AppDataSource.query(query, [userId]);
     return result.length > 0 ? result[0].is_super_admin : false;
+  }
+
+  async updateBasicInfo(
+    userId: string,
+    payload: {
+      user_name?: string;
+      email?: string;
+    }
+  ): Promise<Omit<Admin, 'password'> | null> {
+    const sets: string[] = [];
+    const values: string[] = [];
+
+    if (payload.user_name !== undefined) {
+      sets.push(`user_name = $${sets.length + 1}`);
+      values.push(payload.user_name);
+    }
+
+    if (payload.email !== undefined) {
+      sets.push(`email = $${sets.length + 1}`);
+      values.push(payload.email);
+    }
+
+    if (sets.length === 0) {
+      return this.findByIdWithoutPassword(userId);
+    }
+
+    const query = `
+      UPDATE admin
+      SET ${sets.join(", ")}, updated_at = NOW()
+      WHERE user_id = $${sets.length + 1}
+        AND is_deleted = false
+      RETURNING
+        user_id,
+        user_name,
+        email,
+        is_super_admin,
+        is_deleted,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [...values, userId]);
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<Omit<Admin, 'password'> | null> {
+    const query = `
+      UPDATE admin
+      SET password = $1, updated_at = NOW()
+      WHERE user_id = $2
+        AND is_deleted = false
+      RETURNING
+        user_id,
+        user_name,
+        email,
+        is_super_admin,
+        is_deleted,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [hashedPassword, userId]);
+    return result.length > 0 ? result[0] : null;
   }
 
   /**
