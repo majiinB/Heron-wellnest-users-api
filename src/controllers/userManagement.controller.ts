@@ -279,4 +279,131 @@ export class UserManagementController {
 
     res.status(200).json(response);
   }
+
+  public async handleUpdateCounselor(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
+    const actorRole = req.user?.role;
+    const actorId = req.user?.sub;
+
+    if (!actorRole || !actorId) {
+      throw new AppError(400, "MISSING_USER_INFO", "Authenticated user info is required.", true);
+    }
+
+    const targetCounselorId = req.params.counselorId;
+    if (!targetCounselorId) {
+      throw new AppError(400, "MISSING_COUNSELOR_ID", "Counselor ID is required in the route params.", true);
+    }
+
+    const { user_name, email, department_id } = req.body ?? {};
+
+    if (user_name === undefined && email === undefined && department_id === undefined) {
+      throw new AppError(
+        400,
+        "MISSING_UPDATE_FIELDS",
+        "At least one field must be provided: user_name, email, or department_id.",
+        true,
+      );
+    }
+
+    if (user_name !== undefined && typeof user_name !== "string") {
+      throw new AppError(400, "INVALID_FIELD_TYPES", "user_name must be a string when provided.", true);
+    }
+
+    if (email !== undefined && typeof email !== "string") {
+      throw new AppError(400, "INVALID_FIELD_TYPES", "email must be a string when provided.", true);
+    }
+
+    if (department_id !== undefined && typeof department_id !== "string") {
+      throw new AppError(400, "INVALID_FIELD_TYPES", "department_id must be a string when provided.", true);
+    }
+
+    const result = await this.userManagementService.updateCounselorBasicInfo(
+      actorId,
+      actorRole,
+      targetCounselorId,
+      {
+        ...(user_name !== undefined ? { user_name: user_name.trim() } : {}),
+        ...(email !== undefined ? { email: email.trim().toLowerCase() } : {}),
+        ...(department_id !== undefined ? { department_id: department_id.trim() } : {}),
+      },
+    );
+
+    const response: ApiResponse = {
+      success: true,
+      code: "UPDATED_SUCCESSFULLY",
+      message: "Counselor information updated successfully.",
+      data: result,
+    };
+
+    res.status(200).json(response);
+  }
+
+  public async handleUpdateCounselorPassword(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
+    const actorRole = req.user?.role;
+    const actorId = req.user?.sub;
+
+    if (!actorRole || !actorId) {
+      throw new AppError(400, "MISSING_USER_INFO", "Authenticated user info is required.", true);
+    }
+
+    const targetCounselorId = req.params.counselorId;
+    if (!targetCounselorId) {
+      throw new AppError(400, "MISSING_COUNSELOR_ID", "Counselor ID is required in the route params.", true);
+    }
+
+    const { previous_password, new_password } = req.body ?? {};
+
+    if (!new_password || typeof new_password !== "string") {
+      throw new AppError(400, "MISSING_REQUIRED_FIELDS", "new_password is required and must be a string.", true);
+    }
+
+    if (previous_password !== undefined && typeof previous_password !== "string") {
+      throw new AppError(400, "INVALID_FIELD_TYPES", "previous_password must be a string when provided.", true);
+    }
+
+    const result = await this.userManagementService.updateCounselorPassword(
+      actorId,
+      actorRole,
+      targetCounselorId,
+      new_password,
+      previous_password,
+    );
+
+    const response: ApiResponse = {
+      success: true,
+      code: "UPDATED_SUCCESSFULLY",
+      message: "Counselor password updated successfully.",
+      data: result,
+    };
+
+    res.status(200).json(response);
+  }
+
+  public async handleDeleteCounselor(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
+    const actorRole = req.user?.role;
+    const actorId = req.user?.sub;
+
+    if (!actorRole || !actorId) {
+      throw new AppError(400, "MISSING_USER_INFO", "Authenticated user info is required.", true);
+    }
+
+    const targetCounselorId = req.params.counselorId;
+    if (!targetCounselorId) {
+      throw new AppError(400, "MISSING_COUNSELOR_ID", "Counselor ID is required in the route params.", true);
+    }
+
+    const result = await this.userManagementService.deleteCounselor(
+      actorId,
+      actorRole,
+      targetCounselorId,
+    );
+
+    const response: ApiResponse = {
+      success: true,
+      code: "DELETED_SUCCESSFULLY",
+      message: "Counselor deleted successfully.",
+      data: result,
+    };
+
+    res.status(200).json(response);
+  }
 }

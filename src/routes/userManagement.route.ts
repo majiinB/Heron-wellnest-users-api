@@ -2,6 +2,7 @@ import express from "express";
 import { asyncHandler } from "../utils/asyncHandler.util.js";
 import { heronAuthMiddleware, heronAuthMiddlewareAdmin, heronAuthMiddlewareSuperAdmin } from "../middlewares/heronAuth.middleware..js";
 import { AdminRepository } from "../repository/admin.repository.js";
+import { CollegeDepartmentRepository } from "../repository/collegeDepartment.repository.js";
 import { CounselorRepository } from "../repository/counselor.repository.js";
 import { StudentRepository } from "../repository/student.repository.js";
 import { UserManagementService } from "../services/userManagement.service.js";
@@ -12,7 +13,13 @@ const router = express.Router();
 const adminRepository = new AdminRepository();
 const counselorRepository = new CounselorRepository();
 const studentRepository = new StudentRepository();
-const userManagementService = new UserManagementService(counselorRepository, studentRepository, adminRepository);
+const collegeDepartmentRepository = new CollegeDepartmentRepository();
+const userManagementService = new UserManagementService(
+	counselorRepository,
+	studentRepository,
+	adminRepository,
+	collegeDepartmentRepository,
+);
 const userManagementController = new UserManagementController(userManagementService);
 
 /**
@@ -679,7 +686,7 @@ router.post(
  *   patch:
  *     summary: Update admin basic information
  *     description: |
- *       Updates an admin's basic information.
+ *       Updates an admin's basic information (username and/or email).
  *
  *       **Authorization Rules:**
  *       - **Admin**: Can only update their own info
@@ -690,6 +697,86 @@ router.post(
  *       - Admins
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user_name:
+ *                 type: string
+ *                 description: New username (at least one field required)
+ *                 example: Jane Updated
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: New email address (at least one field required)
+ *                 example: jane.updated@wellnest.com
+ *     responses:
+ *       "200":
+ *         description: Admin information updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: UPDATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Admin information updated successfully.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       is_super_admin:
+ *                         type: boolean
+ *                       is_deleted:
+ *                         type: boolean
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *             examples:
+ *               successResponse:
+ *                 value:
+ *                   success: true
+ *                   code: UPDATED_SUCCESSFULLY
+ *                   message: Admin information updated successfully.
+ *                   data:
+ *                     - user_id: 27acfd01-6db6-4157-a648-61b33c33a4e5
+ *                       user_name: Nomar Maestro
+ *                       email: nomarmaestro@gmail.com
+ *                       is_super_admin: false
+ *                       is_deleted: false
+ *                       created_at: "2026-04-01T15:35:43.983Z"
+ *                       updated_at: "2026-04-01T15:55:54.328Z"
+ *       "400":
+ *         description: Bad request - missing update fields or invalid field types
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - only admins can update admin info
+ *       "404":
+ *         description: Admin not found
+ *       "500":
+ *         description: Internal server error
  */
 router.patch(
 	"/admins/:adminId",
@@ -706,21 +793,417 @@ router.patch(
  *       Updates an admin password.
  *
  *       **Authorization Rules:**
- *       - **Admin**: Can only update their own password and must provide previous_password
- *       - **Super Admin**: Can update own password and non-super-admin passwords
+ *       - **Admin**: Can only update their own password and MUST provide previous_password for verification
+ *       - **Super Admin updating own password**: Must provide previous_password for verification
+ *       - **Super Admin updating another admin's password**: No previous_password required (can be admin or non-super-admin only)
  *       - **Super Admin cannot update other Super Admin passwords**
  *
- *       Note: Super-admin initiated password changes for other admins will notify the user.
+ *       Note: Super-admin initiated password changes for other admins will trigger a notification event.
  *     tags:
  *       - User Management
  *       - Admins
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - new_password
+ *             properties:
+ *               new_password:
+ *                 type: string
+ *                 format: password
+ *                 description: The new password for the admin
+ *                 example: NewSecurePass123!
+ *               previous_password:
+ *                 type: string
+ *                 format: password
+ *                 description: Required when admin is updating their own password or super admin is updating their own password. Not required when super admin is updating another admin's password.
+ *                 example: OldPass123!
+ *     responses:
+ *       "200":
+ *         description: Admin password updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: UPDATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Admin password updated successfully.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       is_super_admin:
+ *                         type: boolean
+ *                       is_deleted:
+ *                         type: boolean
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *             examples:
+ *               successResponse:
+ *                 value:
+ *                   success: true
+ *                   code: UPDATED_SUCCESSFULLY
+ *                   message: Admin password updated successfully.
+ *                   data:
+ *                     - user_id: 27acfd01-6db6-4157-a648-61b33c33a4e5
+ *                       user_name: Nomar Maestro 1
+ *                       email: nomarmaestro@gmail.com
+ *                       is_super_admin: false
+ *                       is_deleted: false
+ *                       created_at: "2026-04-01T15:35:43.983Z"
+ *                       updated_at: "2026-04-02T00:51:03.956Z"
+ *       "400":
+ *         description: Bad request - missing new_password, invalid field types, or previous_password required but not provided
+ *       "401":
+ *         description: Unauthorized - invalid authentication token or incorrect previous_password
+ *       "403":
+ *         description: Forbidden - insufficient permissions or attempting to update another super admin
+ *       "404":
+ *         description: Admin not found
+ *       "500":
+ *         description: Internal server error - failed to update password
  */
 router.patch(
 	"/admins/:adminId/password",
 	heronAuthMiddlewareAdmin,
 	asyncHandler(userManagementController.handleUpdateAdminPassword.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/counselors/{counselorId}:
+ *   patch:
+ *     summary: Update counselor basic information
+ *     description: |
+ *       Updates a counselor's basic information.
+ *
+ *       **Authorization Rules:**
+ *       - **Counselor**: Can only update their own info
+ *       - **Admin/Super Admin**: Can update any counselor info
+ *       - For department updates, provide `department_id` from the database
+ *
+ *       Note: Admin-initiated updates include a placeholder notification event.
+ *     tags:
+ *       - User Management
+ *       - Counselors
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user_name:
+ *                 type: string
+ *                 description: New counselor username (at least one field required)
+ *                 example: Guest Account 67
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: New counselor email (at least one field required)
+ *                 example: guestaccount67@gmail.com
+ *               department_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: New department ID (at least one field required)
+ *                 example: 2fcf458f-6d18-40a0-8a4d-b16a70560259
+ *     responses:
+ *       "200":
+ *         description: Counselor information updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: UPDATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Counselor information updated successfully.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       is_deleted:
+ *                         type: boolean
+ *                       department_id:
+ *                         type: string
+ *                         format: uuid
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *             examples:
+ *               successResponse:
+ *                 value:
+ *                   success: true
+ *                   code: UPDATED_SUCCESSFULLY
+ *                   message: Counselor information updated successfully.
+ *                   data:
+ *                     - user_id: 35a59635-aba5-48c1-b75f-df75a4c3271e
+ *                       user_name: Guest Account 67
+ *                       email: guestaccount67@gmail.com
+ *                       is_deleted: false
+ *                       department_id: 2fcf458f-6d18-40a0-8a4d-b16a70560259
+ *                       created_at: "2026-04-01T15:40:12.238Z"
+ *                       updated_at: "2026-04-02T02:24:11.015Z"
+ *       "400":
+ *         description: Bad request - missing update fields or invalid field types
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - insufficient permission to update target counselor
+ *       "404":
+ *         description: Counselor not found
+ *       "500":
+ *         description: Internal server error
+ */
+router.patch(
+	"/counselors/:counselorId",
+	heronAuthMiddleware,
+	asyncHandler(userManagementController.handleUpdateCounselor.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/counselors/{counselorId}/password:
+ *   patch:
+ *     summary: Update counselor password
+ *     description: |
+ *       Updates a counselor password.
+ *
+ *       **Authorization Rules:**
+ *       - **Counselor**: Can only update their own password and must provide previous_password
+ *       - **Admin/Super Admin**: Can update any counselor password without previous_password
+ *
+ *       Note: Admin-initiated password changes include a placeholder notification event.
+ *     tags:
+ *       - User Management
+ *       - Counselors
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - new_password
+ *             properties:
+ *               new_password:
+ *                 type: string
+ *                 format: password
+ *                 description: New counselor password
+ *                 example: NewSecurePass123!
+ *               previous_password:
+ *                 type: string
+ *                 format: password
+ *                 description: Required when a counselor updates their own password. Not required for admin/super_admin initiated updates.
+ *                 example: OldPass123!
+ *     responses:
+ *       "200":
+ *         description: Counselor password updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: UPDATED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Counselor password updated successfully.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       is_deleted:
+ *                         type: boolean
+ *                       department_id:
+ *                         type: string
+ *                         format: uuid
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *             examples:
+ *               successResponse:
+ *                 value:
+ *                   success: true
+ *                   code: UPDATED_SUCCESSFULLY
+ *                   message: Counselor password updated successfully.
+ *                   data:
+ *                     - user_id: 35a59635-aba5-48c1-b75f-df75a4c3271e
+ *                       user_name: Guest Account 67
+ *                       email: guestaccount67@gmail.com
+ *                       is_deleted: false
+ *                       department_id: 2fcf458f-6d18-40a0-8a4d-b16a70560259
+ *                       created_at: "2026-04-01T15:40:12.238Z"
+ *                       updated_at: "2026-04-02T02:54:23.270Z"
+ *       "400":
+ *         description: Bad request - missing new_password, invalid field types, or previous_password required but not provided
+ *       "401":
+ *         description: Unauthorized - invalid authentication token or incorrect previous_password
+ *       "403":
+ *         description: Forbidden - insufficient permission to update target counselor password
+ *       "404":
+ *         description: Counselor not found
+ *       "500":
+ *         description: Internal server error - failed to update password
+ */
+router.patch(
+	"/counselors/:counselorId/password",
+	heronAuthMiddleware,
+	asyncHandler(userManagementController.handleUpdateCounselorPassword.bind(userManagementController)),
+);
+
+/**
+ * @openapi
+ * /management/counselors/{counselorId}:
+ *   delete:
+ *     summary: Soft delete counselor
+ *     description: |
+ *       Soft deletes a counselor account by setting `is_deleted` to `true`.
+ *
+ *       **Authorization Rules:**
+ *       - **Admin/Super Admin**: Allowed
+ *       - **Counselor/Student**: Forbidden
+ *
+ *       Note: Admin-initiated deletions include a placeholder notification event.
+ *     tags:
+ *       - User Management
+ *       - Counselors
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: Counselor deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: DELETED_SUCCESSFULLY
+ *                 message:
+ *                   type: string
+ *                   example: Counselor deleted successfully.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       is_deleted:
+ *                         type: boolean
+ *                         example: true
+ *                       department_id:
+ *                         type: string
+ *                         format: uuid
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *             examples:
+ *               successResponse:
+ *                 value:
+ *                   success: true
+ *                   code: DELETED_SUCCESSFULLY
+ *                   message: Counselor deleted successfully.
+ *                   data:
+ *                     - user_id: 35a59635-aba5-48c1-b75f-df75a4c3271e
+ *                       user_name: Guest Account 67
+ *                       email: guestaccount67@gmail.com
+ *                       is_deleted: true
+ *                       department_id: 2fcf458f-6d18-40a0-8a4d-b16a70560259
+ *                       created_at: "2026-04-01T15:40:12.238Z"
+ *                       updated_at: "2026-04-02T03:11:16.970Z"
+ *       "400":
+ *         description: Bad request - missing user info or counselor ID
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - only admins can delete counselors
+ *       "404":
+ *         description: Counselor not found
+ *       "500":
+ *         description: Internal server error
+ */
+router.delete(
+	"/counselors/:counselorId",
+	heronAuthMiddlewareAdmin,
+	asyncHandler(userManagementController.handleDeleteCounselor.bind(userManagementController)),
 );
 
 export default router;

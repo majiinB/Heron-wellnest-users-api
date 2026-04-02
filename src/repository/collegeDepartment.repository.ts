@@ -21,4 +21,18 @@ export class CollegeDepartmentRepository {
     const departments: CollegeDepartment[] = await AppDataSource.query(query);
     return departments;
   }
+
+  public async existsById(departmentId: string): Promise<boolean> {
+    const query = `
+      SELECT EXISTS(
+        SELECT 1
+        FROM college_departments
+        WHERE department_id = $1
+          AND is_deleted = false
+      ) as exists
+    `;
+
+    const result = await AppDataSource.query(query, [departmentId]);
+    return result[0].exists;
+  }
 }

@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/datasource.config.js";
 import { hashPassword } from "../utils/crypt.util.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Admin, AdminListItem, PaginatedAdmins } from "../types/admin.type.js";
+import { AppError } from "../types/appError.type.js";
 
 export class AdminRepository {
   public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedAdmins> {
@@ -253,7 +254,7 @@ export class AdminRepository {
     // Check if email already exists
     const existingAdmin = await this.findByEmail(email);
     if (existingAdmin) {
-      throw new Error(`Admin with email ${email} already exists`);
+      throw new AppError(409, "EMAIL_ALREADY_EXISTS", `Admin with email ${email} already exists`, true);
     }
 
     const userId = uuidv4();

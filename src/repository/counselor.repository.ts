@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/datasource.config.js";
 import { hashPassword } from "../utils/crypt.util.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Counselor, CounselorListItem, PaginatedCounselors } from "../types/counselor.type.js";
+import { AppError } from "../types/appError.type.js";
 
 export class CounselorRepository {
   public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedCounselors> {
@@ -84,7 +85,7 @@ export class CounselorRepository {
         email,
         password,
         is_deleted,
-        college_department,
+        department_id,
         created_at,
         updated_at
       FROM counselor
@@ -107,7 +108,7 @@ export class CounselorRepository {
         user_name,
         email,
         is_deleted,
-        college_department,
+        department_id,
         created_at,
         updated_at
       FROM counselor
@@ -130,7 +131,7 @@ export class CounselorRepository {
         user_name,
         email,
         is_deleted,
-        college_department,
+        department_id,
         created_at,
         updated_at
       FROM counselor
@@ -234,6 +235,95 @@ export class CounselorRepository {
   return result;
 }
 
+  async updateBasicInfo(
+    userId: string,
+    payload: {
+      user_name?: string;
+      email?: string;
+      department_id?: string;
+    }
+  ): Promise<Omit<Counselor, 'password'> | null> {
+    const sets: string[] = [];
+    const values: string[] = [];
+
+    if (payload.user_name !== undefined) {
+      sets.push(`user_name = $${sets.length + 1}`);
+      values.push(payload.user_name);
+    }
+
+    if (payload.email !== undefined) {
+      sets.push(`email = $${sets.length + 1}`);
+      values.push(payload.email);
+    }
+
+    if (payload.department_id !== undefined) {
+      sets.push(`department_id = $${sets.length + 1}`);
+      values.push(payload.department_id);
+    }
+
+    if (sets.length === 0) {
+      return this.findByIdWithoutPassword(userId);
+    }
+
+    const query = `
+      UPDATE counselor
+      SET ${sets.join(", ")}, updated_at = NOW()
+      WHERE user_id = $${sets.length + 1}
+        AND is_deleted = false
+      RETURNING
+        user_id,
+        user_name,
+        email,
+        is_deleted,
+        department_id,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [...values, userId]);
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<Omit<Counselor, 'password'> | null> {
+    const query = `
+      UPDATE counselor
+      SET password = $1, updated_at = NOW()
+      WHERE user_id = $2
+        AND is_deleted = false
+      RETURNING
+        user_id,
+        user_name,
+        email,
+        is_deleted,
+        department_id,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [hashedPassword, userId]);
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async softDeleteById(userId: string): Promise<Omit<Counselor, 'password'> | null> {
+    const query = `
+      UPDATE counselor
+      SET is_deleted = true, updated_at = NOW()
+      WHERE user_id = $1
+        AND is_deleted = false
+      RETURNING
+        user_id,
+        user_name,
+        email,
+        is_deleted,
+        department_id,
+        created_at,
+        updated_at
+    `;
+
+    const result = await AppDataSource.query(query, [userId]);
+    return result.length > 0 ? result[0] : null;
+  }
+
   /**
    * Create a new counselor
    * @param user_name - Counselor's name
@@ -251,7 +341,7 @@ export class CounselorRepository {
     // Check if email already exists
     const existingCounselor = await this.findByEmail(email);
     if (existingCounselor) {
-      throw new Error(`Counselor with email ${email} already exists`);
+      throw new AppError(409, "EMAIL_ALREADY_EXISTS", `Counselor with email ${email} already exists`, true);
     }
 
     const userId = uuidv4();
