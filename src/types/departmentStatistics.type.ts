@@ -1,3 +1,10 @@
+export interface SentimentPeriodStat {
+  period_start: string;
+  mood: string;
+  count: number;
+  percentage: number;
+}
+
 export interface DepartmentStatistics {
   department_name: string;
   total_students: number;
@@ -11,4 +18,6 @@ export interface DepartmentStatistics {
   struggling_percentage: number;
   in_crisis_percentage: number;
   not_classified_percentage: number;
+  weekly_sentiments: SentimentPeriodStat[];
+  monthly_sentiments: SentimentPeriodStat[];
 }

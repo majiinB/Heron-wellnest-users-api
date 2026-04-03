@@ -1,6 +1,6 @@
 import { AppDataSource } from "../config/datasource.config.js";
-import type { StudentClassification, ClassificationEnum, MoodCheckIn } from '../types/studentClassification.type.js';
-import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
+import type { StudentClassification, ClassificationEnum } from '../types/studentClassification.type.js';
+import type { DepartmentStatistics, SentimentPeriodStat } from "../types/departmentStatistics.type.js";
 
 /**
  * Filters for querying student classifications.
@@ -28,6 +28,33 @@ export type PaginatedStudentClassifications = {
 }
 
 export class StudentClassificationRepository {
+  private parseSentimentStats(raw: unknown): SentimentPeriodStat[] {
+    if (!raw) {
+      return [];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      return [];
+    }
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        period_start: String(row.period_start ?? ''),
+        mood: String(row.mood ?? ''),
+        count: Number(row.count ?? 0),
+        percentage: Number(row.percentage ?? 0)
+      };
+    }).filter((item) => item.period_start && item.mood);
+  }
+
   public async findAll(filters: StudentClassificationFilters = {}): Promise<PaginatedStudentClassifications> {
     const {
       classification,
@@ -37,7 +64,7 @@ export class StudentClassificationRepository {
     } = filters;
   
     const conditions: string[] = ['s.is_deleted = false'];
-    const parameters: any[] = [];
+    const parameters: Array<string | number> = [];
     let paramIndex = 1;
   
     if (classification) {
@@ -232,17 +259,112 @@ export class StudentClassificationRepository {
           AND cd.department_name = $1
         GROUP BY cd.department_name
       ),
+      department_classification_counts AS (
+        SELECT 
+          cd.department_name,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN s.user_id END) as excelling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN s.user_id END) as thriving_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN s.user_id END) as struggling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN s.user_id END) as in_crisis_count
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
+        WHERE s.is_deleted = false
+          AND cd.department_name = $1
+        GROUP BY cd.department_name
+      ),
       classification_counts AS (
         SELECT 
-          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END) as excelling_count,
-          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END) as thriving_count,
-          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END) as struggling_count,
-          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END) as in_crisis_count
+          COALESCE(dcc.excelling_count, 0) as excelling_count,
+          COALESCE(dcc.thriving_count, 0) as thriving_count,
+          COALESCE(dcc.struggling_count, 0) as struggling_count,
+          COALESCE(dcc.in_crisis_count, 0) as in_crisis_count
         FROM department_students ds
-        LEFT JOIN student s ON s.is_deleted = false
-        LEFT JOIN college_programs cp ON s.program_id = cp.program_id
-        LEFT JOIN college_departments cd ON cp.college_department_id = cd.department_id AND cd.department_name = ds.department_name
-        LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
+        LEFT JOIN department_classification_counts dcc ON dcc.department_name = ds.department_name
+      ),
+      department_moods AS (
+        SELECT
+          cd.department_name,
+          m.checked_in_at,
+          mood
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        INNER JOIN mood_check_ins m ON m.user_id = s.user_id
+        CROSS JOIN LATERAL unnest(array_remove(ARRAY[m.mood_1, m.mood_2, m.mood_3], NULL::varchar)) AS mood
+        WHERE s.is_deleted = false
+          AND cd.department_name = $1
+      ),
+      weekly_sentiment_counts AS (
+        SELECT
+          department_name,
+          date_trunc('week', checked_in_at AT TIME ZONE 'Asia/Manila')::date AS period_start,
+          mood,
+          COUNT(*) AS mood_count
+        FROM department_moods
+        GROUP BY department_name, period_start, mood
+      ),
+      weekly_sentiment_totals AS (
+        SELECT
+          department_name,
+          period_start,
+          SUM(mood_count) AS total_count
+        FROM weekly_sentiment_counts
+        GROUP BY department_name, period_start
+      ),
+      weekly_sentiments AS (
+        SELECT
+          wsc.department_name,
+          jsonb_agg(
+            jsonb_build_object(
+              'period_start', wsc.period_start::text,
+              'mood', wsc.mood,
+              'count', wsc.mood_count,
+              'percentage', ROUND((wsc.mood_count::numeric / NULLIF(wst.total_count, 0)) * 100, 2)
+            )
+            ORDER BY wsc.period_start DESC, wsc.mood ASC
+          ) AS weekly_sentiments
+        FROM weekly_sentiment_counts wsc
+        INNER JOIN weekly_sentiment_totals wst
+          ON wst.department_name = wsc.department_name
+         AND wst.period_start = wsc.period_start
+        GROUP BY wsc.department_name
+      ),
+      monthly_sentiment_counts AS (
+        SELECT
+          department_name,
+          date_trunc('month', checked_in_at AT TIME ZONE 'Asia/Manila')::date AS period_start,
+          mood,
+          COUNT(*) AS mood_count
+        FROM department_moods
+        GROUP BY department_name, period_start, mood
+      ),
+      monthly_sentiment_totals AS (
+        SELECT
+          department_name,
+          period_start,
+          SUM(mood_count) AS total_count
+        FROM monthly_sentiment_counts
+        GROUP BY department_name, period_start
+      ),
+      monthly_sentiments AS (
+        SELECT
+          msc.department_name,
+          jsonb_agg(
+            jsonb_build_object(
+              'period_start', msc.period_start::text,
+              'mood', msc.mood,
+              'count', msc.mood_count,
+              'percentage', ROUND((msc.mood_count::numeric / NULLIF(mst.total_count, 0)) * 100, 2)
+            )
+            ORDER BY msc.period_start DESC, msc.mood ASC
+          ) AS monthly_sentiments
+        FROM monthly_sentiment_counts msc
+        INNER JOIN monthly_sentiment_totals mst
+          ON mst.department_name = msc.department_name
+         AND mst.period_start = msc.period_start
+        GROUP BY msc.department_name
       )
       SELECT 
         ds.department_name,
@@ -271,9 +393,13 @@ export class StudentClassificationRepository {
         ROUND(
           ((ds.total_students - COALESCE(cc.excelling_count, 0) - COALESCE(cc.thriving_count, 0) - COALESCE(cc.struggling_count, 0) - COALESCE(cc.in_crisis_count, 0))::numeric / NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as not_classified_percentage
+        ) as not_classified_percentage,
+        COALESCE(ws.weekly_sentiments, '[]'::jsonb) as weekly_sentiments,
+        COALESCE(ms.monthly_sentiments, '[]'::jsonb) as monthly_sentiments
       FROM department_students ds
       CROSS JOIN classification_counts cc
+      LEFT JOIN weekly_sentiments ws ON ws.department_name = ds.department_name
+      LEFT JOIN monthly_sentiments ms ON ms.department_name = ds.department_name
     `;
   
     const result = await AppDataSource.query(query, [departmentName]);
@@ -294,7 +420,9 @@ export class StudentClassificationRepository {
       thriving_percentage: parseFloat(result[0].thriving_percentage) || 0,
       struggling_percentage: parseFloat(result[0].struggling_percentage) || 0,
       in_crisis_percentage: parseFloat(result[0].in_crisis_percentage) || 0,
-      not_classified_percentage: parseFloat(result[0].not_classified_percentage) || 0
+      not_classified_percentage: parseFloat(result[0].not_classified_percentage) || 0,
+      weekly_sentiments: this.parseSentimentStats(result[0].weekly_sentiments),
+      monthly_sentiments: this.parseSentimentStats(result[0].monthly_sentiments)
     };
   }
   
@@ -321,73 +449,171 @@ export class StudentClassificationRepository {
         INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
         WHERE s.is_deleted = false
         GROUP BY cd.department_name
+      ),
+      department_classification_counts AS (
+        SELECT
+          cd.department_name,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN s.user_id END) as excelling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN s.user_id END) as thriving_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN s.user_id END) as struggling_count,
+          COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN s.user_id END) as in_crisis_count
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
+        WHERE s.is_deleted = false
+        GROUP BY cd.department_name
+      ),
+      department_moods AS (
+        SELECT
+          cd.department_name,
+          m.checked_in_at,
+          mood
+        FROM student s
+        INNER JOIN college_programs cp ON s.program_id = cp.program_id
+        INNER JOIN college_departments cd ON cp.college_department_id = cd.department_id
+        INNER JOIN mood_check_ins m ON m.user_id = s.user_id
+        CROSS JOIN LATERAL unnest(array_remove(ARRAY[m.mood_1, m.mood_2, m.mood_3], NULL::varchar)) AS mood
+        WHERE s.is_deleted = false
+      ),
+      weekly_sentiment_counts AS (
+        SELECT
+          department_name,
+          date_trunc('week', checked_in_at AT TIME ZONE 'Asia/Manila')::date AS period_start,
+          mood,
+          COUNT(*) AS mood_count
+        FROM department_moods
+        GROUP BY department_name, period_start, mood
+      ),
+      weekly_sentiment_totals AS (
+        SELECT
+          department_name,
+          period_start,
+          SUM(mood_count) AS total_count
+        FROM weekly_sentiment_counts
+        GROUP BY department_name, period_start
+      ),
+      weekly_sentiments AS (
+        SELECT
+          wsc.department_name,
+          jsonb_agg(
+            jsonb_build_object(
+              'period_start', wsc.period_start::text,
+              'mood', wsc.mood,
+              'count', wsc.mood_count,
+              'percentage', ROUND((wsc.mood_count::numeric / NULLIF(wst.total_count, 0)) * 100, 2)
+            )
+            ORDER BY wsc.period_start DESC, wsc.mood ASC
+          ) AS weekly_sentiments
+        FROM weekly_sentiment_counts wsc
+        INNER JOIN weekly_sentiment_totals wst
+          ON wst.department_name = wsc.department_name
+         AND wst.period_start = wsc.period_start
+        GROUP BY wsc.department_name
+      ),
+      monthly_sentiment_counts AS (
+        SELECT
+          department_name,
+          date_trunc('month', checked_in_at AT TIME ZONE 'Asia/Manila')::date AS period_start,
+          mood,
+          COUNT(*) AS mood_count
+        FROM department_moods
+        GROUP BY department_name, period_start, mood
+      ),
+      monthly_sentiment_totals AS (
+        SELECT
+          department_name,
+          period_start,
+          SUM(mood_count) AS total_count
+        FROM monthly_sentiment_counts
+        GROUP BY department_name, period_start
+      ),
+      monthly_sentiments AS (
+        SELECT
+          msc.department_name,
+          jsonb_agg(
+            jsonb_build_object(
+              'period_start', msc.period_start::text,
+              'mood', msc.mood,
+              'count', msc.mood_count,
+              'percentage', ROUND((msc.mood_count::numeric / NULLIF(mst.total_count, 0)) * 100, 2)
+            )
+            ORDER BY msc.period_start DESC, msc.mood ASC
+          ) AS monthly_sentiments
+        FROM monthly_sentiment_counts msc
+        INNER JOIN monthly_sentiment_totals mst
+          ON mst.department_name = msc.department_name
+         AND mst.period_start = msc.period_start
+        GROUP BY msc.department_name
       )
       SELECT 
         ds.department_name,
         ds.total_students,
-        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) as excelling_count,
-        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) as thriving_count,
-        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) as struggling_count,
-        COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0) as in_crisis_count,
+        COALESCE(dcc.excelling_count, 0) as excelling_count,
+        COALESCE(dcc.thriving_count, 0) as thriving_count,
+        COALESCE(dcc.struggling_count, 0) as struggling_count,
+        COALESCE(dcc.in_crisis_count, 0) as in_crisis_count,
         (ds.total_students - 
-          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) -
-          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) -
-          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) -
-          COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)
+          COALESCE(dcc.excelling_count, 0) -
+          COALESCE(dcc.thriving_count, 0) -
+          COALESCE(dcc.struggling_count, 0) -
+          COALESCE(dcc.in_crisis_count, 0)
         ) as not_classified_count,
         ROUND(
-          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0)::numeric / 
+          (COALESCE(dcc.excelling_count, 0)::numeric / 
            NULLIF(ds.total_students, 0) * 100), 
           2
         ) as excelling_percentage,
         ROUND(
-          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0)::numeric / 
+          (COALESCE(dcc.thriving_count, 0)::numeric / 
            NULLIF(ds.total_students, 0) * 100), 
           2
         ) as thriving_percentage,
         ROUND(
-          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0)::numeric / 
+          (COALESCE(dcc.struggling_count, 0)::numeric / 
            NULLIF(ds.total_students, 0) * 100), 
           2
         ) as struggling_percentage,
         ROUND(
-          (COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)::numeric / 
+          (COALESCE(dcc.in_crisis_count, 0)::numeric / 
            NULLIF(ds.total_students, 0) * 100), 
           2
         ) as in_crisis_percentage,
         ROUND(
           ((ds.total_students - 
-            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Excelling' THEN latest_sc.student_id END), 0) -
-            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Thriving' THEN latest_sc.student_id END), 0) -
-            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'Struggling' THEN latest_sc.student_id END), 0) -
-            COALESCE(COUNT(DISTINCT CASE WHEN latest_sc.classification = 'InCrisis' THEN latest_sc.student_id END), 0)
+            COALESCE(dcc.excelling_count, 0) -
+            COALESCE(dcc.thriving_count, 0) -
+            COALESCE(dcc.struggling_count, 0) -
+            COALESCE(dcc.in_crisis_count, 0)
           )::numeric / NULLIF(ds.total_students, 0) * 100), 
           2
-        ) as not_classified_percentage
+        ) as not_classified_percentage,
+        COALESCE(ws.weekly_sentiments, '[]'::jsonb) as weekly_sentiments,
+        COALESCE(ms.monthly_sentiments, '[]'::jsonb) as monthly_sentiments
       FROM department_students ds
-      LEFT JOIN student s ON s.is_deleted = false
-      LEFT JOIN college_programs cp ON s.program_id = cp.program_id
-      LEFT JOIN college_departments cd ON cp.college_department_id = cd.department_id AND cd.department_name = ds.department_name
-      LEFT JOIN latest_classifications latest_sc ON latest_sc.student_id = s.user_id AND latest_sc.rn = 1
-      GROUP BY ds.department_name, ds.total_students
+      LEFT JOIN department_classification_counts dcc ON dcc.department_name = ds.department_name
+      LEFT JOIN weekly_sentiments ws ON ws.department_name = ds.department_name
+      LEFT JOIN monthly_sentiments ms ON ms.department_name = ds.department_name
       ORDER BY ds.department_name ASC
     `;
   
     const result = await AppDataSource.query(query);
   
-    return result.map((row: any) => ({
-      department_name: row.department_name,
-      total_students: parseInt(row.total_students, 10),
-      excelling_count: parseInt(row.excelling_count, 10),
-      thriving_count: parseInt(row.thriving_count, 10),
-      struggling_count: parseInt(row.struggling_count, 10),
-      in_crisis_count: parseInt(row.in_crisis_count, 10),
-      not_classified_count: parseInt(row.not_classified_count, 10),
-      excelling_percentage: parseFloat(row.excelling_percentage) || 0,
-      thriving_percentage: parseFloat(row.thriving_percentage) || 0,
-      struggling_percentage: parseFloat(row.struggling_percentage) || 0,
-      in_crisis_percentage: parseFloat(row.in_crisis_percentage) || 0,
-      not_classified_percentage: parseFloat(row.not_classified_percentage) || 0
+    return result.map((row: Record<string, unknown>) => ({
+      department_name: String(row.department_name ?? ''),
+      total_students: parseInt(String(row.total_students ?? '0'), 10),
+      excelling_count: parseInt(String(row.excelling_count ?? '0'), 10),
+      thriving_count: parseInt(String(row.thriving_count ?? '0'), 10),
+      struggling_count: parseInt(String(row.struggling_count ?? '0'), 10),
+      in_crisis_count: parseInt(String(row.in_crisis_count ?? '0'), 10),
+      not_classified_count: parseInt(String(row.not_classified_count ?? '0'), 10),
+      excelling_percentage: parseFloat(String(row.excelling_percentage ?? '0')) || 0,
+      thriving_percentage: parseFloat(String(row.thriving_percentage ?? '0')) || 0,
+      struggling_percentage: parseFloat(String(row.struggling_percentage ?? '0')) || 0,
+      in_crisis_percentage: parseFloat(String(row.in_crisis_percentage ?? '0')) || 0,
+      not_classified_percentage: parseFloat(String(row.not_classified_percentage ?? '0')) || 0,
+      weekly_sentiments: this.parseSentimentStats(row.weekly_sentiments),
+      monthly_sentiments: this.parseSentimentStats(row.monthly_sentiments)
     }));
   }
 }
