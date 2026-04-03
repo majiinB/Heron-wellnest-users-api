@@ -466,6 +466,12 @@ router.post('/students/:studentId', heronAuthMiddleware, asyncHandler(userContro
  *       - Count of students in each classification category (Excelling, Thriving, Struggling, InCrisis)
  *       - Count of students not yet classified
  *       - Percentage breakdown for each category
+ *       - Weekly and monthly mood sentiment breakdowns
+ *
+ *       **Response Formats:**
+ *       - `format=json` (default): standard API response wrapper
+ *       - `format=raw`: raw JSON payload without the response wrapper
+ *       - `format=csv`: CSV file download
  *       
  *       **Note:** Only counts the most recent classification per student. All percentages add up to 100%.
  *     tags:
