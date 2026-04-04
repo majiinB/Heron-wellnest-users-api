@@ -203,6 +203,8 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  *     description: |
  *       Retrieves detailed information for a specific student including:
  *       - Latest classification record
+ *       - Daily classifications for the last 7 days
+ *       - Weekly classifications (latest 7 records)
  *       - Student profile (name, email, program, department)
  *       - 7 most recent mood check-ins (representing a week)
  *       
@@ -285,14 +287,30 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  *                     classification:
  *                       type: string
  *                       enum: [Excelling, Thriving, Struggling, InCrisis]
- *                       example: Thriving
- *                     is_flagged:
- *                       type: boolean
- *                       example: false
+ *                       example: InCrisis
+ *                     classification_probabilities:
+ *                       type: object
+ *                       properties:
+ *                         InCrisis:
+ *                           type: number
+ *                           format: float
+ *                           example: 0.8806940987301506
+ *                         Thriving:
+ *                           type: number
+ *                           format: float
+ *                           example: 0.010512432099127202
+ *                         Excelling:
+ *                           type: number
+ *                           format: float
+ *                           example: 0.0008382617480617205
+ *                         Struggling:
+ *                           type: number
+ *                           format: float
+ *                           example: 0.1079552074226604
  *                     classified_at:
  *                       type: string
  *                       format: date-time
- *                       example: 2025-10-19T11:59:57.729Z
+ *                       example: 2026-03-28T16:00:27.379Z
  *                     user_name:
  *                       type: string
  *                       example: John Doe
@@ -307,7 +325,7 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  *                       example: e2c087e6-e7ec-4f34-a215-b8a67b3a9d92
  *                     program_name:
  *                       type: string
- *                       example: Bachelor of Science in Computer Science (Application Development Elective Track)
+ *                       example: Bachelor of Science in Information Technology (Information and Network Security Elective Track)
  *                     department_name:
  *                       type: string
  *                       example: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
@@ -338,6 +356,80 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  *                             type: string
  *                             format: date-time
  *                             example: 2025-10-22T10:57:55.653Z
+ *                     daily_classifications:
+ *                       type: array
+ *                       description: Daily classifications in the last 7 days
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           classification_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 5c164be4-0dd3-4964-b6ab-075b8ee955ef
+ *                           student_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                           classification:
+ *                             type: string
+ *                             enum: [Excelling, Thriving, Struggling, InCrisis]
+ *                             example: InCrisis
+ *                           classification_probabilities:
+ *                             type: object
+ *                             properties:
+ *                               InCrisis:
+ *                                 type: number
+ *                                 format: float
+ *                                 example: 0.8806940987301506
+ *                               Thriving:
+ *                                 type: number
+ *                                 format: float
+ *                                 example: 0.010512432099127202
+ *                               Excelling:
+ *                                 type: number
+ *                                 format: float
+ *                                 example: 0.0008382617480617205
+ *                               Struggling:
+ *                                 type: number
+ *                                 format: float
+ *                                 example: 0.1079552074226604
+ *                           classified_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2026-03-28T16:00:27.379Z
+ *                     weekly_classifications:
+ *                       type: array
+ *                       description: Weekly classifications from student_weekly_classification
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           weekly_classification_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 4ad53c43-7664-479f-8099-9438016066ff
+ *                           student_id:
+ *                             type: string
+ *                             format: uuid
+ *                             example: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                           week_start:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2026-03-22T00:00:00.000Z
+ *                           week_end:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2026-03-29T00:00:00.000Z
+ *                           dominant_classification:
+ *                             type: string
+ *                             enum: [Excelling, Thriving, Struggling, InCrisis]
+ *                             example: InCrisis
+ *                           is_flagged:
+ *                             type: boolean
+ *                             example: false
+ *                           classified_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2026-03-28T16:00:26.083Z
  *             examples:
  *               successResponse:
  *                 value:
@@ -345,47 +437,51 @@ router.get('/students', heronAuthMiddleware, asyncHandler(userController.handleF
  *                   code: FETCHED_SUCCESSFULLY
  *                   message: Student fetched successfully.
  *                   data:
- *                     classification_id: 539bc580-915c-49b7-a6f6-bf736e791595
- *                     student_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                     classification: Thriving
- *                     is_flagged: false
- *                     classified_at: 2025-10-19T11:59:57.729Z
- *                     user_name: ARTHUR ARTUGUE
- *                     email: aartugue.a12241566@umak.edu.ph
+ *                     classification_id: 5c164be4-0dd3-4964-b6ab-075b8ee955ef
+ *                     student_id: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                     classification: InCrisis
+ *                     classification_probabilities:
+ *                       InCrisis: 0.8806940987301506
+ *                       Thriving: 0.010512432099127202
+ *                       Excelling: 0.0008382617480617205
+ *                       Struggling: 0.1079552074226604
+ *                     classified_at: 2026-03-28T16:00:27.379Z
+ *                     user_name: LEANN LOUISE ORILLE
+ *                     email: lorille.9869@umak.edu.ph
  *                     department_id: e2c087e6-e7ec-4f34-a215-b8a67b3a9d92
- *                     program_name: Bachelor of Science in Computer Science (Application Development Elective Track)
+ *                     program_name: Bachelor of Science in Information Technology (Information and Network Security Elective Track)
  *                     department_name: COLLEGE OF COMPUTING AND INFORMATION SCIENCES
  *                     mood_check_ins:
- *                       - check_in_id: 3e8815d1-c8ba-40f0-af09-575acf1ad67a
- *                         user_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                         mood_1: calm
- *                         mood_2: motivated
- *                         mood_3: content
- *                         checked_in_at: 2025-10-22T10:57:55.653Z
- *                       - check_in_id: 2b58e5f0-e3b7-41fb-be21-a0154f2a1710
- *                         user_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                         mood_1: calm
- *                         mood_2: motivated
- *                         mood_3: content
- *                         checked_in_at: 2025-10-21T19:12:08.551Z
- *                       - check_in_id: c5f7e458-3b7c-4c42-8c15-ceb9ddaf6cf5
- *                         user_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                         mood_1: calm
- *                         mood_2: motivated
- *                         mood_3: content
- *                         checked_in_at: 2025-10-21T19:12:06.626Z
- *                       - check_in_id: 370f95f8-9e8f-43e2-971b-2103e2d1e2e9
- *                         user_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                         mood_1: calm
- *                         mood_2: motivated
- *                         mood_3: content
- *                         checked_in_at: 2025-10-21T19:12:04.955Z
- *                       - check_in_id: fd55344c-c8d7-4818-8801-64b8544154ff
- *                         user_id: c81daef9-bc32-4624-a595-3cdb0f66d559
- *                         mood_1: calm
- *                         mood_2: motivated
- *                         mood_3: content
- *                         checked_in_at: 2025-10-19T10:23:55.926Z
+ *                       - check_in_id: 1e2f2f8f-66b2-4152-9125-a04fe7ee7abd
+ *                         user_id: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                         mood_1: restless
+ *                         mood_2: hopeless
+ *                         mood_3: sad
+ *                         checked_in_at: 2026-03-28T13:34:35.389Z
+ *                       - check_in_id: d1449ce3-6566-413b-9728-9774e7dae048
+ *                         user_id: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                         mood_1: hopeless
+ *                         mood_2: exhausted
+ *                         mood_3: anxious
+ *                         checked_in_at: 2026-03-27T12:50:36.211Z
+ *                     daily_classifications:
+ *                       - classification_id: 5c164be4-0dd3-4964-b6ab-075b8ee955ef
+ *                         student_id: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                         classification: InCrisis
+ *                         classification_probabilities:
+ *                           InCrisis: 0.8806940987301506
+ *                           Thriving: 0.010512432099127202
+ *                           Excelling: 0.0008382617480617205
+ *                           Struggling: 0.1079552074226604
+ *                         classified_at: 2026-03-28T16:00:27.379Z
+ *                     weekly_classifications:
+ *                       - weekly_classification_id: 4ad53c43-7664-479f-8099-9438016066ff
+ *                         student_id: 699ab9b8-36a8-4735-bb0c-2d77cdb5a1b3
+ *                         week_start: 2026-03-22T00:00:00.000Z
+ *                         week_end: 2026-03-29T00:00:00.000Z
+ *                         dominant_classification: InCrisis
+ *                         is_flagged: false
+ *                         classified_at: 2026-03-28T16:00:26.083Z
  *       "400":
  *         description: Bad request - missing credentials or invalid parameters
  *         content:

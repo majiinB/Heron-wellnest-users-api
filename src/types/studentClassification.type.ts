@@ -40,6 +40,8 @@ export interface StudentClassification {
   program_name?: string;
   department_name: string;
   mood_check_ins?: MoodCheckIn[];
+  daily_classifications?: DailyClassification[];
+  weekly_classifications?: WeeklyClassification[];
 }
 
 export interface MoodCheckIn {
@@ -48,6 +50,24 @@ export interface MoodCheckIn {
   mood_2: string;
   mood_3: string;
   checked_in_at: Date;
+}
+
+export interface DailyClassification {
+  classification_id: string;
+  student_id: string;
+  classification: ClassificationEnum;
+  classification_probabilities: ClassificationProbabilities;
+  classified_at: Date;
+}
+
+export interface WeeklyClassification {
+  weekly_classification_id: string;
+  student_id: string;
+  week_start: Date;
+  week_end: Date;
+  dominant_classification: ClassificationEnum;
+  is_flagged: boolean;
+  classified_at: Date;
 }
 
 export interface ClassificationProbabilities {

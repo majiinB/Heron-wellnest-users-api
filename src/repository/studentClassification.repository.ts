@@ -177,11 +177,45 @@ export class StudentClassificationRepository {
     `;
   
     const moodCheckIns = await AppDataSource.query(moodCheckInsQuery, [studentId]);
+
+    const dailyClassificationsQuery = `
+      SELECT
+        classification_id,
+        student_id,
+        classification,
+        classification_probabilities,
+        classified_at
+      FROM student_classification
+      WHERE student_id = $1
+        AND classified_at >= NOW() - INTERVAL '7 days'
+      ORDER BY classified_at DESC
+    `;
+
+    const dailyClassifications = await AppDataSource.query(dailyClassificationsQuery, [studentId]);
+
+    const weeklyClassificationsQuery = `
+      SELECT
+        weekly_classification_id,
+        student_id,
+        week_start,
+        week_end,
+        dominant_classification,
+        is_flagged,
+        classified_at
+      FROM student_weekly_classification
+      WHERE student_id = $1
+      ORDER BY week_start DESC, classified_at DESC
+      LIMIT 7
+    `;
+
+    const weeklyClassifications = await AppDataSource.query(weeklyClassificationsQuery, [studentId]);
   
     // Combine the results
     const result: StudentClassification = {
       ...classificationResult[0],
-      mood_check_ins: moodCheckIns
+      mood_check_ins: moodCheckIns,
+      daily_classifications: dailyClassifications,
+      weekly_classifications: weeklyClassifications
     };
   
     return result;
