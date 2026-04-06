@@ -5,10 +5,16 @@ import type { Counselor, CounselorListItem, PaginatedCounselors } from "../types
 import { AppError } from "../types/appError.type.js";
 
 export class CounselorRepository {
-  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedCounselors> {
+  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string, search?: string): Promise<PaginatedCounselors> {
     const parameters: (string | number)[] = [];
     let paramIndex = 1;
     const conditions: string[] = ["c.is_deleted = false"];
+
+    if (search?.trim()) {
+      conditions.push(`(c.email ILIKE $${paramIndex} OR c.user_name ILIKE $${paramIndex})`);
+      parameters.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
 
     if (cursor) {
       conditions.push(`(c.created_at, c.user_id) < (
@@ -377,5 +383,9 @@ export class CounselorRepository {
     ]);
 
     return result.length > 0 ? result[0] : null;
+  }
+
+  public async searchByEmailOrName(search: string, limit = 10, cursor?: string): Promise<PaginatedCounselors> {
+    return this.findAllWithoutPasswordPaginated(limit, cursor, search);
   }
 }

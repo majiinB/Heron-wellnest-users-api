@@ -29,16 +29,16 @@ export class UserManagementService {
     this.collegeDepartmentRepository = collegeDepartmentRepository;
   }
 
-  public async getPaginatedCounselors(limit = 10, cursor?: string): Promise<PaginatedCounselors> {
-    return this.counselorRepository.findAllWithoutPasswordPaginated(limit, cursor);
+  public async getPaginatedCounselors(limit = 10, cursor?: string, search?: string): Promise<PaginatedCounselors> {
+    return this.counselorRepository.findAllWithoutPasswordPaginated(limit, cursor, search);
   }
 
-  public async getPaginatedStudents(limit = 10, cursor?: string): Promise<PaginatedStudents> {
-    return this.studentRepository.findAllPaginated(limit, cursor);
+  public async getPaginatedStudents(limit = 10, cursor?: string, search?: string): Promise<PaginatedStudents> {
+    return this.studentRepository.findAllPaginated(limit, cursor, search);
   }
 
-  public async getPaginatedAdmins(limit = 10, cursor?: string): Promise<PaginatedAdmins> {
-    return this.adminRepository.findAllWithoutPasswordPaginated(limit, cursor);
+  public async getPaginatedAdmins(limit = 10, cursor?: string, search?: string): Promise<PaginatedAdmins> {
+    return this.adminRepository.findAllWithoutPasswordPaginated(limit, cursor, search);
   }
 
   /**

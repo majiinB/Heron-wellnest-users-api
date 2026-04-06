@@ -2,10 +2,16 @@ import { AppDataSource } from "../config/datasource.config.js";
 import type { PaginatedStudents, Student } from "../types/student.type.js";
 
 export class StudentRepository {
-  public async findAllPaginated(limit = 10, cursor?: string): Promise<PaginatedStudents> {
+  public async findAllPaginated(limit = 10, cursor?: string, search?: string): Promise<PaginatedStudents> {
     const parameters: (string | number)[] = [];
     let paramIndex = 1;
     const conditions: string[] = [];
+
+    if (search?.trim()) {
+      conditions.push(`(s.email ILIKE $${paramIndex} OR s.user_name ILIKE $${paramIndex})`);
+      parameters.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
 
     if (cursor) {
       conditions.push(`(s.created_at, s.user_id) < (
@@ -52,5 +58,9 @@ export class StudentRepository {
       hasMore,
       nextCursor,
     };
+  }
+
+  public async searchByEmailOrName(search: string, limit = 10, cursor?: string): Promise<PaginatedStudents> {
+    return this.findAllPaginated(limit, cursor, search);
   }
 }

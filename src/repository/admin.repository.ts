@@ -5,10 +5,16 @@ import type { Admin, AdminListItem, PaginatedAdmins } from "../types/admin.type.
 import { AppError } from "../types/appError.type.js";
 
 export class AdminRepository {
-  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string): Promise<PaginatedAdmins> {
+  public async findAllWithoutPasswordPaginated(limit = 10, cursor?: string, search?: string): Promise<PaginatedAdmins> {
     const parameters: (string | number)[] = [];
     let paramIndex = 1;
     const conditions: string[] = ["a.is_deleted = false"];
+
+    if (search?.trim()) {
+      conditions.push(`(a.email ILIKE $${paramIndex} OR a.user_name ILIKE $${paramIndex})`);
+      parameters.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
 
     if (cursor) {
       conditions.push(`(a.created_at, a.user_id) < (
@@ -290,5 +296,9 @@ export class AdminRepository {
     ]);
 
     return result.length > 0 ? result[0] : null;
+  }
+
+  public async searchByEmailOrName(search: string, limit = 10, cursor?: string): Promise<PaginatedAdmins> {
+    return this.findAllWithoutPasswordPaginated(limit, cursor, search);
   }
 }
