@@ -36,6 +36,7 @@ const userManagementController = new UserManagementController(userManagementServ
  *
  *       **Pagination:**
  *       - Uses cursor-based pagination with `limit` and `cursor`
+ *       - Supports optional `search` query filtering (e.g., by name/email)
  *       - `nextCursor` contains the `user_id` of the last counselor in the current page
  *     tags:
  *       - User Management
@@ -59,6 +60,12 @@ const userManagementController = new UserManagementController(userManagementServ
  *           format: uuid
  *         description: Counselor user_id of the last item from the previous page
  *         example: ac57c94e-f6c8-4e10-b7ac-c364538195dc
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Optional search term for filtering counselors by relevant fields
+ *         example: jane
  *     responses:
  *       "200":
  *         description: Counselors fetched successfully
@@ -208,6 +215,7 @@ router.get(
  *
  *       **Pagination:**
  *       - Uses cursor-based pagination with `limit` and `cursor`
+ *       - Supports optional `search` query filtering (e.g., by name/email)
  *       - `nextCursor` contains the `user_id` of the last student in the current page
  *     tags:
  *       - User Management
@@ -231,6 +239,12 @@ router.get(
  *           format: uuid
  *         description: Student user_id of the last item from the previous page
  *         example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Optional search term for filtering students by relevant fields
+ *         example: john
  *     responses:
  *       "200":
  *         description: Students fetched successfully
@@ -392,6 +406,7 @@ router.get(
  *
  *       **Pagination:**
  *       - Uses cursor-based pagination with `limit` and `cursor`
+ *       - Supports optional `search` query filtering (e.g., by name/email)
  *       - `nextCursor` contains the `user_id` of the last admin in the current page
  *     tags:
  *       - User Management
@@ -415,6 +430,12 @@ router.get(
  *           format: uuid
  *         description: Admin user_id of the last item from the previous page
  *         example: ac57c94e-f6c8-4e10-b7ac-c364538195dc
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Optional search term for filtering admins by relevant fields
+ *         example: admin
  *     responses:
  *       "200":
  *         description: Admins fetched successfully

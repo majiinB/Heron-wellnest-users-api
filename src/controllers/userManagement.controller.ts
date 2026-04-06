@@ -30,8 +30,9 @@ export class UserManagementController {
     }
 
     const cursor = req.query.cursor as string | undefined;
+    const search = req.query.search as string | undefined;
 
-    const result = await this.userManagementService.getPaginatedCounselors(limit, cursor);
+    const result = await this.userManagementService.getPaginatedCounselors(limit, cursor, search);
 
     const response: ApiResponse = {
       success: true,
@@ -62,8 +63,9 @@ export class UserManagementController {
     }
 
     const cursor = req.query.cursor as string | undefined;
+    const search = req.query.search as string | undefined;
 
-    const result = await this.userManagementService.getPaginatedStudents(limit, cursor);
+    const result = await this.userManagementService.getPaginatedStudents(limit, cursor, search);
 
     const response: ApiResponse = {
       success: true,
@@ -94,8 +96,9 @@ export class UserManagementController {
     }
 
     const cursor = req.query.cursor as string | undefined;
+    const search = req.query.search as string | undefined;
 
-    const result = await this.userManagementService.getPaginatedAdmins(limit, cursor);
+    const result = await this.userManagementService.getPaginatedAdmins(limit, cursor, search);
 
     const response: ApiResponse = {
       success: true,
