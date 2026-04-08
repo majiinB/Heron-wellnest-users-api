@@ -133,6 +133,10 @@ export class UserService {
     return this.studentClassificationRepo.getAllDepartmentsStatistics();
   }
 
+  public async getAllStudentAnalytics(): Promise<Record<string, unknown>[]> {
+    return this.studentClassificationRepo.findAllStudentAnalytics();
+  }
+
   public async getCounselorByDepartment(departmentId: string): Promise<Promise<Omit<Counselor, 'password'>[]> | null> {
     return this.counselorRepository.findByDepartmentWithoutPassword(departmentId);
   } 

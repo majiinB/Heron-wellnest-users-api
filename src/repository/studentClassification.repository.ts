@@ -268,6 +268,11 @@ export class StudentClassificationRepository {
     return result.length > 0 ? result[0] : null;
   }
 
+  public async findAllStudentAnalytics(): Promise<Record<string, unknown>[]> {
+    const query = "SELECT * FROM student_analytics";
+    return AppDataSource.query(query);
+  }
+
     /**
    * Get statistics for students classified in a specific department
    * Returns counts and percentages for each classification category

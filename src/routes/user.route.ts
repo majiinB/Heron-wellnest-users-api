@@ -32,6 +32,51 @@ const userController = new UserController(userService);
  *           example: Invalid input data
  */
 
+
+/**
+ * @openapi
+ * /students/analytics:
+ *   get:
+ *     summary: Fetch all student analytics rows
+ *     description: |
+ *       Retrieves all rows and columns from the `student_analytics` table.
+ *
+ *       **Authorization Requirements:**
+ *       - **Admins/Super Admins**: Allowed
+ *       - **Counselors**: Allowed
+ *       - **Students**: Forbidden
+ *
+ *       **Formats:**
+ *       - `format=json` (default): wrapped API response
+ *       - `format=raw`: raw rows only
+ *       - `format=csv`: CSV download
+ *     tags:
+ *       - Students
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [json, raw, csv]
+ *           default: json
+ *         description: Response format
+ *     responses:
+ *       "200":
+ *         description: Student analytics fetched successfully
+ *       "400":
+ *         description: Bad request - missing user role
+ *       "401":
+ *         description: Unauthorized - invalid or missing authentication token
+ *       "403":
+ *         description: Forbidden - insufficient permissions
+ *       "500":
+ *         description: Internal server error
+ */
+router.get('/students/analytics', heronAuthMiddleware, asyncHandler(userController.handleFetchingStudentAnalytics.bind(userController)));
+
 /**
  * @openapi
  * /students:

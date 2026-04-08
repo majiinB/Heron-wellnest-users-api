@@ -7,6 +7,7 @@ import { AppError } from "../types/appError.type.js";
 import type { DepartmentStatistics } from "../types/departmentStatistics.type.js";
 
 type DepartmentStatisticsFormat = "json" | "raw" | "csv";
+type StudentAnalyticsFormat = "json" | "raw" | "csv";
 
 export class UserController {
   private userService: UserService;
@@ -58,6 +59,29 @@ export class UserController {
         this.escapeCsvValue(JSON.stringify(row.weekly_sentiments ?? [])),
         this.escapeCsvValue(JSON.stringify(row.monthly_sentiments ?? []))
       ].join(","));
+    }
+
+    return lines.join("\n");
+  }
+
+  private serializeDynamicRowsToCsv(rows: Record<string, unknown>[]): string {
+    if (rows.length === 0) {
+      return "";
+    }
+
+    const headers = Object.keys(rows[0]);
+    const lines = [headers.map((header) => this.escapeCsvValue(header)).join(",")];
+
+    for (const row of rows) {
+      lines.push(
+        headers.map((header) => {
+          const value = row[header];
+          if (value !== null && typeof value === "object") {
+            return this.escapeCsvValue(JSON.stringify(value));
+          }
+          return this.escapeCsvValue(value);
+        }).join(","),
+      );
     }
 
     return lines.join("\n");
@@ -157,6 +181,43 @@ export class UserController {
       message: "Department statistics fetched successfully.",
       data: result!
     }
+
+    res.status(200).json(response);
+  }
+
+  public async handleFetchingStudentAnalytics(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
+    const role = req.user?.role;
+    const format = String(req.query.format ?? "json").toLowerCase() as StudentAnalyticsFormat;
+
+    if (!role) {
+      throw new AppError(400, "MISSING_USER_INFO", "User role is required.", true);
+    }
+
+    if (role !== "admin" && role !== "super_admin" && role !== "counselor") {
+      throw new AppError(403, "FORBIDDEN_ACCESS", "Only admins and counselors can access this resource.", true);
+    }
+
+    const result = await this.userService.getAllStudentAnalytics();
+
+    if (format === "csv") {
+      const csv = this.serializeDynamicRowsToCsv(result);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=student-analytics.csv");
+      res.status(200).send(csv);
+      return;
+    }
+
+    if (format === "raw") {
+      res.status(200).json(result);
+      return;
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      code: "FETCHED_SUCCESSFULLY",
+      message: "Student analytics fetched successfully.",
+      data: result,
+    };
 
     res.status(200).json(response);
   }
