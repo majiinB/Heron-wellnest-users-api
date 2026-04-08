@@ -98,6 +98,8 @@ jobs:
           JWT_AUDIENCE: ${{ toJSON(vars.JWT_AUDIENCE) }}
           JWT_ALGORITHM: ${{ toJSON(vars.JWT_ALGORITHM) }}
           CORS_ALLOWED_ORIGINS: ${{ toJSON(vars.CORS_ALLOWED_ORIGINS) }}
+          GCS_BUCKET_NAME: ${{ toJSON(vars.GCS_BUCKET_NAME) }}
+          GCS_PROJECT_ID: ${{ toJSON(vars.GCS_PROJECT_ID) }}
           EOF
 
       # Deploy to Cloud Run
