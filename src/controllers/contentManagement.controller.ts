@@ -78,11 +78,6 @@ export class ContentManagementController {
   }
 
   public async handleFetchAllContent(req: AuthenticatedRequest, res: Response, _next: NextFunction): Promise<void> {
-    const role = req.user?.role;
-
-    if (!role) {
-      throw new AppError(400, "MISSING_USER_INFO", "User role is required.", true);
-    }
 
     const result = await this.contentManagementService.getAllContent();
 
