@@ -1,5 +1,6 @@
 import { env } from "./env.config.js";
 import { DataSource } from "typeorm";
+import { ContentManagement } from "../models/contentManagement.model.js";
 
 /**
  * Data source configuration for TypeORM.
@@ -25,7 +26,7 @@ export const AppDataSource = new DataSource({
   username: env.DB_USER,
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
-  entities: [], 
+  entities: [ContentManagement], 
   ...(env.NODE_ENV === "production" && {
     ssl: {
       rejectUnauthorized: false,

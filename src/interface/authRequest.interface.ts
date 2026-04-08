@@ -21,3 +21,11 @@ export interface AuthenticatedRequest extends Request {
     picture?: string;
   };
 }
+
+/**
+ * Extended AuthenticatedRequest interface to include file upload information
+ * Used with multer middleware for handling file uploads
+ */
+export interface AuthenticatedRequestWithFile extends AuthenticatedRequest {
+  file?: Express.Multer.File;
+}

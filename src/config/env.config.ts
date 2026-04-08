@@ -46,6 +46,10 @@ export const envSchema = z.object({
   JWT_AUDIENCE: z.string().default("heron-wellnest-users"),
   JWT_ALGORITHM: z.enum(["HS256", "RS256"]).default("HS256"),
 
+  // Google Cloud Storage
+  GCS_BUCKET_NAME: z.string().min(1, "GCS_BUCKET_NAME is required"),
+  GCS_PROJECT_ID: z.string().min(1, "GCS_PROJECT_ID is required"),
+
   // CORS
   CORS_ALLOWED_ORIGINS: z.string().min(1, "CORS_ALLOWED_ORIGINS is required"),
 }).superRefine((env, ctx) => {
