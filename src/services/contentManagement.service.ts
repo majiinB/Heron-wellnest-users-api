@@ -14,8 +14,7 @@ import {
   extensionFromMimeType,
   generateImageHash,
 } from "../utils/imageUpload.util.js";
-import { uploadBufferToGcs, objectExistsInGcs, getSignedUrl } from "../config/cloudStorage.config.js";
-import { env } from "../config/env.config.js";
+import { uploadBufferToGcs, objectExistsInGcs, getPublicUrl } from "../config/cloudStorage.config.js";
 
 export class ContentManagementService {
   private contentManagementRepository: ContentManagementRepository;
@@ -125,13 +124,13 @@ export class ContentManagementService {
     // Check if image already exists
     const imageAlreadyUploaded = await objectExistsInGcs(objectPath);
     if (imageAlreadyUploaded) {
-      const signedUrl = await getSignedUrl(objectPath);
+      const publicUrl = getPublicUrl(objectPath);
       return {
         success: true,
         code: "CONTENT_IMAGE_ALREADY_UPLOADED",
         message: "This image was already uploaded.",
         data: {
-          image_url: signedUrl,
+          image_url: publicUrl,
           content_type: detectedMimeType,
           size_bytes: imageSize,
           duplicate: true,
@@ -140,7 +139,7 @@ export class ContentManagementService {
     }
 
     // Upload image to GCS
-    const gcsUri = await uploadBufferToGcs({
+    await uploadBufferToGcs({
       buffer: imageFile.buffer,
       destination: objectPath,
       contentType: detectedMimeType,
@@ -153,15 +152,15 @@ export class ContentManagementService {
       },
     });
 
-    // Get signed URL for the uploaded image
-    const signedUrl = await getSignedUrl(objectPath);
+    // Get public URL for the uploaded image
+    const publicUrl = getPublicUrl(objectPath);
 
     return {
       success: true,
       code: "CONTENT_IMAGE_UPLOADED",
       message: "Content image uploaded successfully.",
       data: {
-        image_url: signedUrl,
+        image_url: publicUrl,
         content_type: detectedMimeType,
         size_bytes: imageSize,
         duplicate: false,
